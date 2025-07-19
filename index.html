@@ -6,7 +6,7 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
     
-    <title>BMS Reader</title>
+    <title>BMS Reader v4.0</title>
     
     <!-- Capacitor Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,84 +16,30 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React -->
+    <!-- React 18 -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
         body { 
             margin: 0; 
             padding: 0; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             background-color: #f9fafb;
-            overscroll-behavior: none;
-            -webkit-user-select: none;
-            user-select: none;
             height: 100vh;
             overflow: hidden;
         }
         
-        #root {
-            height: 100vh;
-            width: 100vw;
-        }
+        .safe-area-top { padding-top: env(safe-area-inset-top); }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
         
-        /* iOS Safe Area */
-        .safe-area-top {
-            padding-top: env(safe-area-inset-top);
-        }
-        
-        .safe-area-bottom {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-        
-        /* Prevent text selection on mobile */
-        * {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-        }
-        
-        /* Custom scrollbar for webkit */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 2px;
-        }
-        
-        /* Loading spinner */
-        .spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #3498db;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Button press effect */
         .button-press:active {
             transform: scale(0.98);
             transition: transform 0.1s ease;
         }
         
-        /* Fade in animation */
         .fade-in {
-            animation: fadeIn 0.5s ease-in;
+            animation: fadeIn 0.3s ease-in;
         }
         
         @keyframes fadeIn {
@@ -103,77 +49,19 @@
     </style>
 </head>
 <body>
+    <!-- React Root Container -->
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/javascript">
         const { useState, useEffect, useRef } = React;
 
-        console.log('Script loading...');
+        console.log('🚀 BMS Reader v4.0 starting...');
 
-        // Mock Capacitor and BLE for development/testing
-        if (typeof window.Capacitor === 'undefined') {
-            console.log('Capacitor not available - setting up mocks');
-            window.Capacitor = {
-                isNativePlatform: () => false,
-                getPlatform: () => 'web'
-            };
-            
-            window.BleClient = {
-                initialize: () => {
-                    console.log('Mock BLE: initialize');
-                    return Promise.resolve();
-                },
-                isEnabled: () => {
-                    console.log('Mock BLE: isEnabled');
-                    return Promise.resolve(false);
-                },
-                enable: () => {
-                    console.log('Mock BLE: enable');
-                    return Promise.reject(new Error('Bluetooth not available in browser'));
-                },
-                requestLEScan: (options, callback) => {
-                    console.log('Mock BLE: requestLEScan');
-                    return Promise.reject(new Error('Bluetooth LE not available in browser'));
-                },
-                stopLEScan: () => Promise.resolve(),
-                connect: () => Promise.reject(new Error('Bluetooth connection not available in browser')),
-                disconnect: () => Promise.resolve(),
-                getServices: () => Promise.resolve([]),
-                startNotifications: () => Promise.reject(new Error('Bluetooth notifications not available in browser')),
-                stopNotifications: () => Promise.resolve(),
-                write: () => Promise.reject(new Error('Bluetooth write not available in browser'))
-            };
-            
-            window.numbersToDataView = (numbers) => new DataView(new Uint8Array(numbers).buffer);
-            window.dataViewToNumbers = (dataView) => Array.from(new Uint8Array(dataView.buffer));
-        } else {
-            console.log('Capacitor available');
-        }
-
-        // Icon Components
-        const Icon = ({ path, size = 20, className = "" }) => (
-            React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2",
-                strokeLinecap: "round",
-                strokeLinejoin: "round"
-            }, React.createElement('path', { d: path }))
-        );
-
+        // Icon Components - Using React.createElement for compatibility
         const Battery = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('rect', { width: "18", height: "12", x: "3", y: "6", rx: "2", ry: "2" }),
                 React.createElement('path', { d: "m23 13-1-1-1 1v-2l1-1 1 1z" })
@@ -182,13 +70,8 @@
 
         const Zap = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('polygon', { points: "13,2 3,14 12,14 11,22 21,10 12,10 13,2" })
             )
@@ -196,13 +79,8 @@
 
         const Activity = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('path', { d: "m22 12-4-4-4 4" }),
                 React.createElement('path', { d: "M16 12h-4" }),
@@ -212,13 +90,8 @@
 
         const Thermometer = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('path', { d: "M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" })
             )
@@ -226,61 +99,18 @@
 
         const Settings = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('circle', { cx: "12", cy: "12", r: "3" }),
                 React.createElement('path', { d: "M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" })
             )
         );
 
-        const Wifi = ({ size = 20, className = "" }) => (
-            React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
-            },
-                React.createElement('path', { d: "M12 20h.01" }),
-                React.createElement('path', { d: "M2 8.82a15 15 0 0 1 20 0" }),
-                React.createElement('path', { d: "M5 12.859a10 10 0 0 1 14 0" }),
-                React.createElement('path', { d: "M8.5 16.429a5 5 0 0 1 7 0" })
-            )
-        );
-
-        const WifiOff = ({ size = 20, className = "" }) => (
-            React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
-            },
-                React.createElement('path', { d: "M12 20h.01" }),
-                React.createElement('path', { d: "M8.5 16.429a5 5 0 0 1 7 0" }),
-                React.createElement('path', { d: "m2 2 20 20" })
-            )
-        );
-
         const RefreshCw = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('path', { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }),
                 React.createElement('path', { d: "M21 3v5h-5" }),
@@ -291,59 +121,18 @@
 
         const Search = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('circle', { cx: "11", cy: "11", r: "8" }),
                 React.createElement('path', { d: "m21 21-4.35-4.35" })
             )
         );
 
-        const Smartphone = ({ size = 20, className = "" }) => (
-            React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
-            },
-                React.createElement('rect', { width: "14", height: "20", x: "5", y: "2", rx: "2", ry: "2" }),
-                React.createElement('path', { d: "M12 18h.01" })
-            )
-        );
-
-        const Globe = ({ size = 20, className = "" }) => (
-            React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
-            },
-                React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
-                React.createElement('path', { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" }),
-                React.createElement('path', { d: "M2 12h20" })
-            )
-        );
-
         const TrendingUp = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('polyline', { points: "22,7 13.5,15.5 8.5,10.5 2,17" }),
                 React.createElement('polyline', { points: "16,7 22,7 22,13" })
@@ -352,293 +141,968 @@
 
         const Shield = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
                 React.createElement('path', { d: "M20 13c0 5-3.5 7.5-8 7.5s-8-2.5-8-7.5c0-1.3.5-2.3 1.2-3.2L12 2l6.8 7.8c.7.9 1.2 1.9 1.2 3.2Z" })
             )
         );
 
-        const Bluetooth = ({ size = 20, className = "" }) => (
+        const Wifi = ({ size = 20, className = "" }) => (
             React.createElement('svg', {
-                width: size,
-                height: size,
-                className: className,
-                viewBox: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                strokeWidth: "2"
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
             },
-                React.createElement('path', { d: "m7 7 10 10-5 5V2l5 5L7 17" })
+                React.createElement('path', { d: "M12 20h.01" }),
+                React.createElement('path', { d: "M2 8.82a15 15 0 0 1 20 0" }),
+                React.createElement('path', { d: "M5 12.859a10 10 0 0 1 14 0" }),
+                React.createElement('path', { d: "M8.5 16.429a5 5 0 0 1 7 0" })
             )
         );
 
+        const WifiOff = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+            },
+                React.createElement('path', { d: "M12 20h.01" }),
+                React.createElement('path', { d: "M8.5 16.429a5 5 0 0 1 7 0" }),
+                React.createElement('path', { d: "m2 2 20 20" })
+            )
+        );
+
+        const AlertCircle = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+            },
+                React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
+                React.createElement('line', { x1: "12", y1: "8", x2: "12", y2: "12" }),
+                React.createElement('line', { x1: "12", y1: "16", x2: "12.01", y2: "16" })
+            )
+        );
+
+        const Eye = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+            },
+                React.createElement('path', { d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" }),
+                React.createElement('circle', { cx: "12", cy: "12", r: "3" })
+            )
+        );
+
+        const EyeOff = ({ size = 20, className = "" }) => (
+            React.createElement('svg', {
+                width: size, height: size, className: className,
+                viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+            },
+                React.createElement('path', { d: "M9.88 9.88a3 3 0 1 0 4.24 4.24" }),
+                React.createElement('path', { d: "M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a13.16 13.16 0 0 1-1.67 2.68" }),
+                React.createElement('path', { d: "M6.61 6.61A13.526 13.526 0 0 0 1 12s4 8 11 8a9.74 9.74 0 0 0 5.39-1.61" }),
+                React.createElement('line', { x1: "2", y1: "2", x2: "22", y2: "22" })
+            )
+        );
+
+        // BMS Configuration
+        const BMS_SERVICES = {
+            XIAOXIANG: {
+                serviceUuid: '0000ffe0-0000-1000-8000-00805f9b34fb',
+                readCharacteristic: '0000ffe1-0000-1000-8000-00805f9b34fb',
+                writeCharacteristic: '0000ffe1-0000-1000-8000-00805f9b34fb'
+            }
+        };
+
+        const BMSCommands = {
+            xiaoxiang: {
+                getBasicInfo: () => [0xDD, 0xA5, 0x03, 0x00, 0xFF, 0xFD, 0x77],
+                getCellVoltages: () => [0xDD, 0xA5, 0x04, 0x00, 0xFF, 0xFC, 0x77]
+            }
+        };
+
+        // FIXED: Multiple data preparation methods for Capacitor BLE
+        const prepareDataForBLE = (commandArray) => {
+            console.log('🔧 Preparing BLE data:', commandArray);
+            
+            // Method 1: Try DataView (recommended by Capacitor docs)
+            try {
+                const uint8Array = new Uint8Array(commandArray);
+                const dataView = new DataView(uint8Array.buffer);
+                console.log('✅ Created DataView, buffer length:', dataView.buffer.byteLength);
+                return dataView;
+            } catch (error) {
+                console.error('❌ DataView creation failed:', error);
+            }
+            
+            // Method 2: Try ArrayBuffer directly
+            try {
+                const buffer = new ArrayBuffer(commandArray.length);
+                const view = new Uint8Array(buffer);
+                for (let i = 0; i < commandArray.length; i++) {
+                    view[i] = commandArray[i];
+                }
+                console.log('✅ Created ArrayBuffer, length:', buffer.byteLength);
+                return buffer;
+            } catch (error) {
+                console.error('❌ ArrayBuffer creation failed:', error);
+            }
+            
+            // Method 3: Try Uint8Array
+            try {
+                const uint8Array = new Uint8Array(commandArray);
+                console.log('✅ Created Uint8Array, length:', uint8Array.length);
+                return uint8Array;
+            } catch (error) {
+                console.error('❌ Uint8Array creation failed:', error);
+            }
+            
+            console.error('❌ All data preparation methods failed');
+            return null;
+        };
+
+        const arrayBufferToNumbers = (buffer) => {
+            try {
+                if (buffer instanceof ArrayBuffer) {
+                    return Array.from(new Uint8Array(buffer));
+                }
+                if (buffer instanceof Uint8Array) {
+                    return Array.from(buffer);
+                }
+                return Array.from(new Uint8Array(buffer));
+            } catch (error) {
+                console.error('❌ Error converting buffer to numbers:', error);
+                return [];
+            }
+        };
+
+        // BMS Data Parser
+        const parseXiaoxiangData = (data) => {
+            console.log('🔍 Parsing Xiaoxiang data, length:', data.length);
+            console.log('📄 Raw data:', data.map(b => b.toString(16).padStart(2, '0')).join(' '));
+            
+            if (!data || data.length < 34) {
+                console.log('⚠️ Data too short for Xiaoxiang protocol');
+                return null;
+            }
+            
+            try {
+                // Find header
+                let startIndex = 0;
+                for (let i = 0; i < data.length - 34; i++) {
+                    if (data[i] === 0xDD && data[i + 1] === 0x03) {
+                        startIndex = i;
+                        break;
+                    }
+                }
+                
+                const d = data.slice(startIndex);
+                console.log('📊 Processing data from index:', startIndex);
+                
+                const voltage = ((d[4] << 8) | d[5]) * 0.01;
+                const current = (((d[6] << 8) | d[7]) - 30000) * 0.01;
+                const remainingCapacity = ((d[8] << 8) | d[9]) * 0.01;
+                const nominalCapacity = ((d[10] << 8) | d[11]) * 0.01;
+                const cycles = (d[12] << 8) | d[13];
+                const soc = d[23];
+                const temperature = ((d[24] << 8) | d[25]) / 10 - 273.15;
+                
+                const protection1 = d[20];
+                const protection2 = d[21];
+                
+                const result = {
+                    voltage,
+                    current,
+                    power: Math.abs(voltage * current),
+                    soc,
+                    temperature,
+                    cycles,
+                    capacity: nominalCapacity,
+                    remainingCapacity,
+                    protection: {
+                        overvoltage: !!(protection1 & 0x01),
+                        undervoltage: !!(protection1 & 0x02),
+                        overcurrent: !!(protection1 & 0x04),
+                        overtemperature: !!(protection1 & 0x08),
+                        shortCircuit: !!(protection1 & 0x10),
+                        chargeMosfet: !!(protection2 & 0x01),
+                        dischargeMosfet: !!(protection2 & 0x02)
+                    },
+                    balancing: !!(protection2 & 0x04),
+                    charging: current > 0.1,
+                    discharging: current < -0.1
+                };
+                
+                console.log('✅ Successfully parsed BMS data:', result);
+                return result;
+            } catch (error) {
+                console.error('❌ Error parsing Xiaoxiang data:', error);
+                return null;
+            }
+        };
+
+        const identifyBMSType = (deviceName) => {
+            if (!deviceName) return { type: 'Unknown BMS', protocol: 'xiaoxiang' };
+            
+            const name = deviceName.toLowerCase();
+            
+            if (name.includes('xiaoxiang') || name.includes('smart')) {
+                return { type: 'Xiaoxiang BMS', protocol: 'xiaoxiang' };
+            }
+            if (name.includes('jk') || name.includes('jikong')) {
+                return { type: 'JK BMS', protocol: 'jk' };
+            }
+            if (name.includes('daly')) {
+                return { type: 'DALY BMS', protocol: 'daly' };
+            }
+            if (name.includes('ant')) {
+                return { type: 'ANT BMS', protocol: 'xiaoxiang' };
+            }
+            if (name.includes('seplos')) {
+                return { type: 'SEPLOS BMS', protocol: 'xiaoxiang' };
+            }
+            if (name.includes('llt')) {
+                return { type: 'LLT Power BMS', protocol: 'xiaoxiang' };
+            }
+            
+            return { type: 'Unknown BMS', protocol: 'xiaoxiang' };
+        };
+
+        // Initialize BLE
+        const initializeBLE = async () => {
+            try {
+                console.log('🚀 Starting BLE initialization...');
+                
+                if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
+                    throw new Error('Not running in native environment');
+                }
+
+                let BleClient = null;
+                
+                // Try multiple import methods
+                if (window.Capacitor?.Plugins?.BluetoothLe) {
+                    BleClient = window.Capacitor.Plugins.BluetoothLe;
+                    console.log('✅ Found BLE plugin in Capacitor.Plugins');
+                } else if (window.CapacitorBluetoothLe) {
+                    BleClient = window.CapacitorBluetoothLe.BleClient;
+                    console.log('✅ Found BLE plugin in window.CapacitorBluetoothLe');
+                } else {
+                    try {
+                        const bleModule = await import('@capacitor-community/bluetooth-le');
+                        BleClient = bleModule.BleClient;
+                        console.log('✅ Dynamic import successful');
+                    } catch (importError) {
+                        console.error('❌ Dynamic import failed:', importError);
+                    }
+                }
+                
+                if (!BleClient) {
+                    throw new Error('BleClient not available');
+                }
+                
+                console.log('🔧 Initializing BLE Client...');
+                await BleClient.initialize();
+                console.log('✅ BLE Client initialized');
+                
+                let isEnabled = false;
+                try {
+                    const result = await BleClient.isEnabled();
+                    isEnabled = result?.value !== undefined ? result.value : result;
+                    console.log('📶 Bluetooth enabled:', isEnabled);
+                } catch (statusError) {
+                    console.warn('⚠️ Could not check Bluetooth status:', statusError);
+                    isEnabled = true; // Assume enabled if check fails
+                }
+                
+                return { BleClient, isEnabled };
+            } catch (error) {
+                console.error('❌ BLE initialization error:', error);
+                throw error;
+            }
+        };
+
         // Main BMS Reader App Component
         const BMSReaderApp = () => {
-            console.log('BMSReaderApp rendering...');
-            
+            // State management
+            const [currentTab, setCurrentTab] = useState('dashboard');
             const [isConnected, setIsConnected] = useState(false);
             const [isConnecting, setIsConnecting] = useState(false);
-            const [currentTab, setCurrentTab] = useState('dashboard');
-            const [lastUpdate, setLastUpdate] = useState(null);
-            const [connectionError, setConnectionError] = useState('');
+            const [isScanning, setIsScanning] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
             const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
             const [isNativeApp, setIsNativeApp] = useState(false);
+            const [connectionError, setConnectionError] = useState('');
+            const [lastUpdate, setLastUpdate] = useState(null);
             const [discoveredDevices, setDiscoveredDevices] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
+            const [connectedDevice, setConnectedDevice] = useState(null);
+            const [connectedDeviceId, setConnectedDeviceId] = useState(null);
+            const [bleClient, setBleClient] = useState(null);
+            const [showRawData, setShowRawData] = useState(false);
+            
+            const dataUpdateInterval = useRef(null);
             
             const [bmsData, setBmsData] = useState({
-                voltage: 48.2,
-                current: -5.3,
-                power: 255.5,
-                soc: 85,
-                temperature: 24.5,
-                cycles: 147,
-                capacity: 100,
-                remainingCapacity: 85,
-                cells: [
-                    { id: 1, voltage: 3.412, temperature: 24.1 },
-                    { id: 2, voltage: 3.408, temperature: 24.3 },
-                    { id: 3, voltage: 3.415, temperature: 24.0 },
-                    { id: 4, voltage: 3.410, temperature: 24.2 },
-                    { id: 5, voltage: 3.411, temperature: 24.1 },
-                    { id: 6, voltage: 3.409, temperature: 24.4 },
-                    { id: 7, voltage: 3.413, temperature: 23.9 },
-                    { id: 8, voltage: 3.407, temperature: 24.2 }
-                ],
+                voltage: 0,
+                current: 0,
+                power: 0,
+                soc: 0,
+                temperature: 0,
+                cycles: 0,
+                capacity: 0,
+                remainingCapacity: 0,
+                cells: [],
                 balancing: false,
                 charging: false,
-                discharging: true,
+                discharging: false,
                 protection: {
                     overvoltage: false,
                     undervoltage: false,
                     overcurrent: false,
                     overtemperature: false,
                     shortCircuit: false,
-                    chargeMosfet: true,
-                    dischargeMosfet: true
+                    chargeMosfet: false,
+                    dischargeMosfet: false
                 },
-                rawData: 'DD 03 00 20 12 D2 EB 5C 00 64 00 64 00 93 00 00 55 4B 07 D0 00 00 55',
-                bmsType: 'Demo Mode',
-                deviceName: 'Demo BMS Device'
+                rawData: '',
+                bmsType: '',
+                deviceName: 'Brak połączenia'
             });
 
+            // Initialize app
             useEffect(() => {
-                console.log('useEffect running...');
-                
                 const initializeApp = async () => {
                     try {
+                        console.log('🚀 Initializing app...');
                         const isNative = window.Capacitor?.isNativePlatform() || false;
-                        console.log('Is native app:', isNative);
                         setIsNativeApp(isNative);
                         
-                        if (!isNative) {
-                            setConnectionError('Aplikacja działa w trybie demo. Uruchom jako natywną aplikację dla pełnej funkcjonalności.');
-                            
-                            // Start demo data simulation
-                            const demoInterval = setInterval(() => {
-                                setBmsData(prev => ({
-                                    ...prev,
-                                    voltage: 48.0 + Math.random() * 0.8,
-                                    current: -6.0 + Math.random() * 3.0,
-                                    power: Math.abs((48.0 + Math.random() * 0.8) * (-6.0 + Math.random() * 3.0)),
-                                    soc: Math.max(0, Math.min(100, prev.soc + (Math.random() - 0.5) * 1)),
-                                    temperature: 24.0 + Math.random() * 3.0,
-                                    cells: prev.cells.map(cell => ({
-                                        ...cell,
-                                        voltage: 3.4 + Math.random() * 0.05,
-                                        temperature: 24.0 + Math.random() * 2.0
-                                    }))
-                                }));
-                                setLastUpdate(new Date());
-                            }, 2000);
-                            
-                            return () => clearInterval(demoInterval);
-                        } else {
-                            // Initialize Bluetooth for native app
+                        if (isNative) {
                             try {
-                                if (window.BleClient) {
-                                    await window.BleClient.initialize();
-                                    const enabled = await window.BleClient.isEnabled();
-                                    setIsBluetoothEnabled(enabled);
-                                    console.log('Bluetooth enabled:', enabled);
-                                }
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                const { BleClient, isEnabled } = await initializeBLE();
+                                setBleClient(BleClient);
+                                setIsBluetoothEnabled(isEnabled);
+                                console.log('✅ App initialized successfully');
                             } catch (error) {
-                                console.error('Bluetooth init error:', error);
+                                console.error('❌ BLE init error:', error);
                                 setConnectionError(`Błąd inicjalizacji Bluetooth: ${error.message}`);
                             }
+                        } else {
+                            setConnectionError('Aplikacja wymaga natywnego środowiska mobilnego');
                         }
                     } catch (error) {
-                        console.error('App initialization error:', error);
+                        console.error('❌ App init error:', error);
                         setConnectionError(`Błąd inicjalizacji: ${error.message}`);
                     } finally {
                         setIsLoading(false);
-                        console.log('App initialization completed');
                     }
                 };
                 
                 initializeApp();
             }, []);
 
+            // Cleanup on unmount
+            useEffect(() => {
+                return () => {
+                    if (dataUpdateInterval.current) {
+                        clearInterval(dataUpdateInterval.current);
+                    }
+                };
+            }, []);
+
+            // FIXED: Scan for BMS devices with proper callback handling
             const scanForBMSDevices = async () => {
-                if (!isNativeApp) {
-                    setConnectionError('Skanowanie wymaga natywnej aplikacji mobilnej');
+                console.log('🔍 Starting BMS device scan...');
+                
+                if (!isNativeApp || !bleClient) {
+                    setConnectionError('BLE nie jest dostępny');
                     return;
                 }
                 
-                setIsConnecting(true);
-                setConnectionError('Skanowanie urządzeń BMS...');
+                if (!isBluetoothEnabled) {
+                    setConnectionError('Bluetooth jest wyłączony. Włącz Bluetooth w ustawieniach.');
+                    return;
+                }
+                
+                setIsScanning(true);
+                setConnectionError('');
                 setDiscoveredDevices([]);
                 
                 try {
-                    if (window.BleClient) {
-                        await window.BleClient.requestLEScan(
-                            { 
-                                services: [
-                                    '0000ff00-0000-1000-8000-00805f9b34fb',
-                                    '0000ffe0-0000-1000-8000-00805f9b34fb',
-                                    '0000fff0-0000-1000-8000-00805f9b34fb'
-                                ] 
-                            },
-                            (result) => {
-                                console.log('Device found:', result);
-                                if (result.device) {
-                                    setDiscoveredDevices(prev => {
-                                        const exists = prev.find(d => d.deviceId === result.device.deviceId);
-                                        if (!exists) {
-                                            return [...prev, { 
-                                                ...result.device, 
-                                                rssi: result.rssi || -50,
-                                                bmsType: 'Unknown BMS'
-                                            }];
-                                        }
-                                        return prev;
-                                    });
-                                }
-                            }
-                        );
-                        
-                        setTimeout(async () => {
-                            try {
-                                await window.BleClient.stopLEScan();
-                                setIsConnecting(false);
-                                if (discoveredDevices.length === 0) {
-                                    setConnectionError('Nie znaleziono urządzeń BMS. Sprawdź czy BMS jest włączony i w zasięgu.');
-                                } else {
-                                    setConnectionError('');
-                                }
-                            } catch (error) {
-                                console.error('Error stopping scan:', error);
-                            }
-                        }, 15000);
+                    // Request permissions for Android
+                    if (window.Capacitor?.getPlatform() === 'android') {
+                        try {
+                            await bleClient.requestPermissions();
+                        } catch (permError) {
+                            console.warn('⚠️ Permission request failed:', permError);
+                        }
                     }
+                    
+                    const discoveredDevicesList = [];
+
+                    // FIXED: Set up listener first, then start scan
+                    if (bleClient.addListener) {
+                        console.log('📡 Setting up scan result listener...');
+                        const scanResultListener = bleClient.addListener('onScanResult', (result) => {
+                            console.log('📨 Device discovered via listener:', result);
+                            
+                            const device = result.device || result;
+                            const rssi = result.rssi || device.rssi || -50;
+                            
+                            if (device && device.name && device.name.trim() !== '' &&
+                                !discoveredDevicesList.find(d => d.deviceId === device.deviceId)) {
+                                
+                                const bmsInfo = identifyBMSType(device.name);
+                                
+                                const newDevice = {
+                                    name: device.name,
+                                    deviceId: device.deviceId,
+                                    rssi: rssi,
+                                    bmsType: bmsInfo.type,
+                                    protocol: bmsInfo.protocol,
+                                    address: device.deviceId
+                                };
+                                
+                                console.log('📱 Found device:', newDevice.name, '(', newDevice.bmsType, ')');
+                                discoveredDevicesList.push(newDevice);
+                                setDiscoveredDevices([...discoveredDevicesList]);
+                            }
+                        });
+                    }
+
+                    // Start scan with callback
+                    await bleClient.requestLEScan(
+                        { allowDuplicates: false },
+                        (result) => {
+                            console.log('📨 Device discovered via callback:', result);
+                            
+                            const device = result.device || result;
+                            const rssi = result.rssi || device.rssi || -50;
+                            
+                            if (device && device.name && device.name.trim() !== '' &&
+                                !discoveredDevicesList.find(d => d.deviceId === device.deviceId)) {
+                                
+                                const bmsInfo = identifyBMSType(device.name);
+                                
+                                const newDevice = {
+                                    name: device.name,
+                                    deviceId: device.deviceId,
+                                    rssi: rssi,
+                                    bmsType: bmsInfo.type,
+                                    protocol: bmsInfo.protocol,
+                                    address: device.deviceId
+                                };
+                                
+                                console.log('📱 Found device via callback:', newDevice.name, '(', newDevice.bmsType, ')');
+                                discoveredDevicesList.push(newDevice);
+                                setDiscoveredDevices([...discoveredDevicesList]);
+                            }
+                        }
+                    );
+                    
+                    console.log('🔍 Scan started, waiting for devices...');
+                    
+                    // Stop scanning after 10 seconds
+                    setTimeout(async () => {
+                        try {
+                            await bleClient.stopLEScan();
+                            
+                            // Clean up listener if it exists
+                            if (bleClient.removeAllListeners) {
+                                bleClient.removeAllListeners();
+                            }
+                            
+                            setIsScanning(false);
+                            console.log(`✅ Scan completed. Found ${discoveredDevicesList.length} devices`);
+                            console.log('📋 Device list:', discoveredDevicesList.map(d => d.name));
+                            
+                            if (discoveredDevicesList.length === 0) {
+                                setConnectionError('Nie znaleziono urządzeń BMS. Sprawdź czy urządzenie jest włączone i w zasięgu.');
+                            }
+                        } catch (error) {
+                            console.error('❌ Error stopping scan:', error);
+                            setIsScanning(false);
+                        }
+                    }, 10000);
+                    
                 } catch (error) {
-                    console.error('Scan error:', error);
+                    console.error('❌ Scan failed:', error);
+                    setIsScanning(false);
                     setConnectionError(`Błąd skanowania: ${error.message}`);
-                    setIsConnecting(false);
                 }
             };
 
-            const connectToDevice = async (device) => {
-                setIsConnecting(true);
-                setConnectionError('Łączenie z urządzeniem...');
+            // FIXED: Improved BMS data reading with multiple data format attempts
+            const readBMSData = async (device) => {
+                if (!bleClient || !device || !isConnected) return;
                 
                 try {
-                    if (window.BleClient) {
-                        await window.BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
-                            console.log('Device disconnected:', disconnectedDeviceId);
-                            setIsConnected(false);
-                            setConnectionError('Urządzenie zostało rozłączone');
+                    console.log('📖 Reading BMS data from:', device.name);
+                    
+                    const services = BMS_SERVICES.XIAOXIANG;
+                    const serviceUuid = services.serviceUuid;
+                    const writeCharacteristic = services.writeCharacteristic;
+                    const readCharacteristic = services.readCharacteristic;
+                    
+                    const commandArray = BMSCommands.xiaoxiang.getBasicInfo();
+                    console.log('📝 Command:', commandArray.map(b => b.toString(16).padStart(2, '0')).join(' '));
+                    
+                    // Try multiple data formats until one works
+                    const dataFormats = [
+                        () => {
+                            const uint8Array = new Uint8Array(commandArray);
+                            return new DataView(uint8Array.buffer);
+                        },
+                        () => {
+                            const buffer = new ArrayBuffer(commandArray.length);
+                            const view = new Uint8Array(buffer);
+                            for (let i = 0; i < commandArray.length; i++) {
+                                view[i] = commandArray[i];
+                            }
+                            return buffer;
+                        },
+                        () => new Uint8Array(commandArray),
+                        () => commandArray.map(b => b.toString(16).padStart(2, '0')).join('')
+                    ];
+                    
+                    let writeSuccess = false;
+                    let commandData = null;
+                    
+                    // Try each data format
+                    for (let i = 0; i < dataFormats.length && !writeSuccess; i++) {
+                        try {
+                            commandData = dataFormats[i]();
+                            console.log(`🔄 Trying data format ${i + 1}:`, typeof commandData);
+                            
+                            // Try writeWithoutResponse first
+                            try {
+                                await bleClient.writeWithoutResponse({
+                                    deviceId: device.deviceId,
+                                    service: serviceUuid,
+                                    characteristic: writeCharacteristic,
+                                    value: commandData
+                                });
+                                
+                                console.log('✅ WriteWithoutResponse successful with format', i + 1);
+                                writeSuccess = true;
+                            } catch (writeError) {
+                                console.log(`⚠️ WriteWithoutResponse failed with format ${i + 1}, trying write:`, writeError.message);
+                                
+                                // Try regular write
+                                try {
+                                    await bleClient.write({
+                                        deviceId: device.deviceId,
+                                        service: serviceUuid,
+                                        characteristic: writeCharacteristic,
+                                        value: commandData
+                                    });
+                                    
+                                    console.log('✅ Write successful with format', i + 1);
+                                    writeSuccess = true;
+                                } catch (regularWriteError) {
+                                    console.log(`❌ Regular write failed with format ${i + 1}:`, regularWriteError.message);
+                                }
+                            }
+                        } catch (formatError) {
+                            console.log(`❌ Data format ${i + 1} creation failed:`, formatError.message);
+                        }
+                    }
+                    
+                    if (!writeSuccess) {
+                        throw new Error('All write methods and data formats failed');
+                    }
+                    
+                    // Wait for BMS to process
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    // Try to read response
+                    console.log('📥 Attempting to read response...');
+                    
+                    let responseData = null;
+                    let readSuccess = false;
+                    
+                    // Try direct read first
+                    try {
+                        const result = await bleClient.read({
+                            deviceId: device.deviceId,
+                            service: serviceUuid,
+                            characteristic: readCharacteristic
                         });
                         
-                        setIsConnected(true);
-                        setConnectionError('');
-                        setDiscoveredDevices([]);
-                        setBmsData(prev => ({ 
-                            ...prev, 
-                            deviceName: device.name || 'BMS Device',
-                            bmsType: device.bmsType || 'Unknown BMS'
-                        }));
+                        console.log('📄 Read result type:', typeof result);
                         
-                        console.log('Successfully connected to:', device.name);
+                        if (result && result.buffer) {
+                            responseData = arrayBufferToNumbers(result.buffer);
+                        } else if (result && result.value) {
+                            responseData = arrayBufferToNumbers(result.value);
+                        } else {
+                            responseData = arrayBufferToNumbers(result);
+                        }
+                        
+                        readSuccess = true;
+                        console.log('✅ Direct read successful! Data length:', responseData.length);
+                        
+                    } catch (readError) {
+                        console.log('⚠️ Direct read failed, trying notifications:', readError.message);
+                        
+                        // Try using notifications instead
+                        let notificationReceived = false;
+                        let notificationData = null;
+                        
+                        try {
+                            console.log('🔔 Setting up notifications...');
+                            
+                            await bleClient.startNotifications({
+                                deviceId: device.deviceId,
+                                service: serviceUuid,
+                                characteristic: readCharacteristic
+                            }, (result) => {
+                                console.log('📨 Notification received!');
+                                try {
+                                    if (result && result.buffer) {
+                                        notificationData = arrayBufferToNumbers(result.buffer);
+                                    } else if (result && result.value) {
+                                        notificationData = arrayBufferToNumbers(result.value);
+                                    } else {
+                                        notificationData = arrayBufferToNumbers(result);
+                                    }
+                                    notificationReceived = true;
+                                    console.log('✅ Notification data processed, length:', notificationData.length);
+                                } catch (parseError) {
+                                    console.error('❌ Error parsing notification:', parseError);
+                                }
+                            });
+                            
+                            // Resend command with notifications active
+                            console.log('🔄 Resending command with notifications active...');
+                            await bleClient.write({
+                                deviceId: device.deviceId,
+                                service: serviceUuid,
+                                characteristic: writeCharacteristic,
+                                value: commandData
+                            });
+                            
+                            // Wait for notification
+                            let waitTime = 0;
+                            while (!notificationReceived && waitTime < 5000) {
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                waitTime += 100;
+                            }
+                            
+                            // Stop notifications
+                            try {
+                                await bleClient.stopNotifications({
+                                    deviceId: device.deviceId,
+                                    service: serviceUuid,
+                                    characteristic: readCharacteristic
+                                });
+                            } catch (stopError) {
+                                console.warn('⚠️ Error stopping notifications:', stopError);
+                            }
+                            
+                            if (notificationReceived && notificationData) {
+                                responseData = notificationData;
+                                readSuccess = true;
+                                console.log('✅ Got data via notifications!');
+                            }
+                            
+                        } catch (notifyError) {
+                            console.error('❌ Notification approach also failed:', notifyError);
+                        }
+                    }
+                    
+                    // Process response data
+                    if (readSuccess && responseData && responseData.length > 0) {
+                        console.log('🔍 Processing response data...');
+                        console.log('📊 Raw hex:', responseData.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase());
+                        
+                        // Parse the response
+                        const parsedData = parseXiaoxiangData(responseData);
+                        
+                        if (parsedData) {
+                            console.log('✅ Successfully parsed BMS data');
+                            setBmsData(prev => ({
+                                ...prev,
+                                ...parsedData,
+                                rawData: responseData.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase(),
+                                bmsType: device.bmsType,
+                                deviceName: device.name
+                            }));
+                            setLastUpdate(new Date());
+                            setConnectionError(''); // Clear errors on success
+                        } else {
+                            console.log('⚠️ Could not parse data, showing raw response');
+                            setBmsData(prev => ({
+                                ...prev,
+                                rawData: responseData.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase(),
+                                bmsType: device.bmsType,
+                                deviceName: device.name
+                            }));
+                            setLastUpdate(new Date());
+                            setConnectionError('Otrzymano dane, ale nie udało się ich parsować. Sprawdź protokół BMS.');
+                        }
+                    } else {
+                        console.warn('❌ No response data received from BMS');
+                        setConnectionError('BMS nie odpowiada na komendy. Sprawdź kompatybilność protokołu.');
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error reading BMS data:', error);
+                    setConnectionError(`Błąd komunikacji z BMS: ${error.message}`);
+                }
+            };
+
+            // Read cell voltages with same improved approach
+            const readCellVoltages = async (device) => {
+                if (!bleClient || !device || !isConnected) return;
+                
+                try {
+                    console.log('🔋 Reading cell voltages...');
+                    
+                    const services = BMS_SERVICES.XIAOXIANG;
+                    const serviceUuid = services.serviceUuid;
+                    const writeCharacteristic = services.writeCharacteristic;
+                    const readCharacteristic = services.readCharacteristic;
+                    
+                    const commandArray = BMSCommands.xiaoxiang.getCellVoltages();
+                    
+                    // Use same improved data sending approach
+                    let writeSuccess = false;
+                    const dataFormats = [
+                        () => {
+                            const uint8Array = new Uint8Array(commandArray);
+                            return new DataView(uint8Array.buffer);
+                        },
+                        () => {
+                            const buffer = new ArrayBuffer(commandArray.length);
+                            const view = new Uint8Array(buffer);
+                            for (let i = 0; i < commandArray.length; i++) {
+                                view[i] = commandArray[i];
+                            }
+                            return buffer;
+                        },
+                        () => new Uint8Array(commandArray)
+                    ];
+                    
+                    for (let i = 0; i < dataFormats.length && !writeSuccess; i++) {
+                        try {
+                            const commandData = dataFormats[i]();
+                            
+                            try {
+                                await bleClient.writeWithoutResponse({
+                                    deviceId: device.deviceId,
+                                    service: serviceUuid,
+                                    characteristic: writeCharacteristic,
+                                    value: commandData
+                                });
+                                writeSuccess = true;
+                            } catch (writeError) {
+                                await bleClient.write({
+                                    deviceId: device.deviceId,
+                                    service: serviceUuid,
+                                    characteristic: writeCharacteristic,
+                                    value: commandData
+                                });
+                                writeSuccess = true;
+                            }
+                        } catch (formatError) {
+                            console.log(`Cell voltage format ${i + 1} failed:`, formatError.message);
+                        }
+                    }
+                    
+                    if (!writeSuccess) {
+                        console.log('❌ Failed to send cell voltage command');
+                        return;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    // Read response
+                    try {
+                        const result = await bleClient.read({
+                            deviceId: device.deviceId,
+                            service: serviceUuid,
+                            characteristic: readCharacteristic
+                        });
+                        
+                        let responseData = null;
+                        if (result && result.buffer) {
+                            responseData = arrayBufferToNumbers(result.buffer);
+                        } else {
+                            responseData = arrayBufferToNumbers(result);
+                        }
+                        
+                        // Parse cell voltages (simplified for Xiaoxiang)
+                        const cells = [];
+                        if (responseData && responseData.length >= 6) {
+                            const cellCount = Math.min(responseData[3] || 16, 16);
+                            console.log('🔋 Found', cellCount, 'cells');
+                            
+                            for (let i = 0; i < cellCount && (4 + i * 2 + 1) < responseData.length; i++) {
+                                const voltage = ((responseData[4 + i * 2] << 8) | responseData[5 + i * 2]) * 0.001;
+                                if (voltage > 0 && voltage < 5) { // Reasonable voltage range
+                                    cells.push({
+                                        id: i + 1,
+                                        voltage: voltage,
+                                        temperature: bmsData.temperature
+                                    });
+                                }
+                            }
+                        }
+                        
+                        if (cells.length > 0) {
+                            setBmsData(prev => ({
+                                ...prev,
+                                cells: cells
+                            }));
+                            console.log('✅ Cell voltages updated:', cells.length, 'cells');
+                        }
+                        
+                    } catch (readError) {
+                        console.log('❌ Could not read cell voltages:', readError.message);
                     }
                 } catch (error) {
-                    console.error('Connection error:', error);
+                    console.error('❌ Error reading cell voltages:', error);
+                }
+            };
+
+            // Connect to device
+            const connectToDevice = async (device) => {
+                console.log('🔗 Connecting to device:', device.name);
+                setIsConnecting(true);
+                setConnectionError('Łączenie z ' + device.name + '...');
+                
+                try {
+                    if (!bleClient) {
+                        throw new Error('BLE Client not available');
+                    }
+                    
+                    await bleClient.connect({ deviceId: device.deviceId });
+                    console.log('✅ Connected to device');
+                    
+                    const services = await bleClient.getServices({ deviceId: device.deviceId });
+                    console.log('📋 Available services:', services.services?.length || 0);
+                    
+                    setIsConnected(true);
+                    setConnectedDeviceId(device.deviceId);
+                    setConnectedDevice(device);
+                    setConnectionError('');
+                    setDiscoveredDevices([]);
+                    
+                    setBmsData(prev => ({
+                        ...prev,
+                        bmsType: device.bmsType,
+                        deviceName: device.name,
+                        cells: []
+                    }));
+                    
+                    console.log('🚀 Starting data reading...');
+                    
+                    // Start reading data immediately
+                    await readBMSData(device);
+                    await readCellVoltages(device);
+                    
+                    // Set up periodic data reading
+                    dataUpdateInterval.current = setInterval(async () => {
+                        if (isConnected) {
+                            try {
+                                await readBMSData(device);
+                                // Read cell voltages less frequently
+                                if (Math.random() > 0.7) {
+                                    await readCellVoltages(device);
+                                }
+                            } catch (error) {
+                                console.error('❌ Error in periodic data read:', error);
+                            }
+                        }
+                    }, 5000);
+                    
+                } catch (error) {
+                    console.error('❌ Connection error:', error);
                     setConnectionError(`Błąd połączenia: ${error.message}`);
+                    setIsConnected(false);
+                    setConnectedDeviceId(null);
+                    setConnectedDevice(null);
                 } finally {
                     setIsConnecting(false);
                 }
             };
 
+            // Disconnect from BMS
             const disconnectFromBMS = async () => {
                 try {
-                    if (window.BleClient && isConnected) {
-                        // Implement actual disconnect logic here
-                        console.log('Disconnecting from BMS...');
+                    console.log('🔌 Disconnecting from BMS...');
+                    
+                    if (dataUpdateInterval.current) {
+                        clearInterval(dataUpdateInterval.current);
+                        dataUpdateInterval.current = null;
                     }
+                    
+                    if (bleClient && connectedDeviceId) {
+                        await bleClient.disconnect({ deviceId: connectedDeviceId });
+                    }
+                    
                     setIsConnected(false);
+                    setConnectedDeviceId(null);
+                    setConnectedDevice(null);
                     setConnectionError('');
-                    setBmsData(prev => ({ ...prev, deviceName: 'Demo BMS Device', bmsType: 'Demo Mode' }));
-                } catch (error) {
-                    console.error('Disconnect error:', error);
-                }
-            };
-
-            const refreshData = () => {
-                console.log('Refreshing data...');
-                setLastUpdate(new Date());
-                
-                if (!isNativeApp) {
-                    // Update demo data
-                    setBmsData(prev => ({
+                    
+                    setBmsData(prev => ({ 
                         ...prev,
-                        voltage: 48.0 + Math.random() * 0.8,
-                        current: -6.0 + Math.random() * 3.0,
-                        soc: Math.max(0, Math.min(100, prev.soc + (Math.random() - 0.5) * 2)),
-                        temperature: 24.0 + Math.random() * 3.0
+                        voltage: 0,
+                        current: 0,
+                        power: 0,
+                        soc: 0,
+                        temperature: 0,
+                        cycles: 0,
+                        capacity: 0,
+                        remainingCapacity: 0,
+                        cells: [],
+                        balancing: false,
+                        charging: false,
+                        discharging: false,
+                        protection: {
+                            overvoltage: false,
+                            undervoltage: false,
+                            overcurrent: false,
+                            overtemperature: false,
+                            shortCircuit: false,
+                            chargeMosfet: false,
+                            dischargeMosfet: false
+                        },
+                        rawData: '',
+                        deviceName: 'Brak połączenia',
+                        bmsType: ''
                     }));
-                }
-            };
-
-            const enableBluetooth = async () => {
-                try {
-                    if (window.BleClient) {
-                        await window.BleClient.enable();
-                        setIsBluetoothEnabled(true);
-                        setConnectionError('');
-                    }
+                    
+                    console.log('✅ Disconnected successfully');
                 } catch (error) {
-                    console.error('Enable Bluetooth error:', error);
-                    setConnectionError('Nie udało się włączyć Bluetooth. Włącz ręcznie w ustawieniach.');
+                    console.error('❌ Disconnect error:', error);
+                    setConnectionError(`Błąd podczas rozłączania: ${error.message}`);
                 }
             };
 
-            // Loading Screen Component
-            const LoadingScreen = () => (
-                React.createElement('div', { 
-                    className: "h-screen flex items-center justify-center bg-blue-600 text-white" 
-                },
-                    React.createElement('div', { className: "text-center" },
-                        React.createElement('div', { className: "spinner mx-auto mb-4" }),
-                        React.createElement('h1', { className: "text-2xl font-bold mb-2" }, 'BMS Reader'),
-                        React.createElement('p', { className: "text-blue-100" }, 'Inicjalizacja...')
-                    )
-                )
-            );
+            // Refresh data
+            const refreshData = async () => {
+                console.log('🔄 Refreshing data...');
+                if (connectedDevice && isConnected) {
+                    try {
+                        await readBMSData(connectedDevice);
+                        await readCellVoltages(connectedDevice);
+                    } catch (error) {
+                        console.error('❌ Error refreshing data:', error);
+                        setConnectionError(`Błąd odczytu danych: ${error.message}`);
+                    }
+                }
+            };
 
             // Tab Button Component
             const TabButton = ({ id, icon: Icon, label, active, onClick }) => (
                 React.createElement('button', {
                     onClick: () => onClick(id),
-                    className: `flex-1 flex flex-col items-center py-3 px-1 transition-colors button-press ${
+                    className: `flex-1 flex flex-col items-center py-3 px-1 transition-colors ${
                         active 
-                            ? 'text-blue-600 bg-blue-50 border-t-2 border-blue-600' 
-                            : 'text-gray-600 hover:text-blue-500'
+                        ? 'text-blue-600 bg-blue-50 border-t-2 border-blue-600' 
+                        : 'text-gray-600 hover:text-blue-500'
                     }`
                 }, 
                     React.createElement(Icon, { size: 20, className: "mb-1" }),
@@ -654,7 +1118,7 @@
                             React.createElement('h3', { className: "font-medium text-gray-900" }, 
                                 device.name || 'Nieznane urządzenie'
                             ),
-                            React.createElement('p', { className: "text-sm text-gray-600" }, device.deviceId),
+                            React.createElement('p', { className: "text-sm text-gray-600 font-mono" }, device.deviceId),
                             React.createElement('div', { className: "flex items-center space-x-2 mt-1" },
                                 React.createElement('span', { className: "text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded" },
                                     device.bmsType || 'Unknown'
@@ -667,69 +1131,27 @@
                         React.createElement('button', {
                             onClick: () => onConnect(device),
                             disabled: isConnecting,
-                            className: "bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50 button-press"
-                        }, 'Połącz')
+                            className: "bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-all"
+                        }, isConnecting ? 'Łączenie...' : 'Połącz')
                     )
                 )
             );
 
-            // Dashboard Tab Component
+            // Status Badge Component
+            const StatusBadge = ({ active, label, color = 'green' }) => (
+                React.createElement('div', { className: "flex items-center space-x-2" },
+                    React.createElement('div', { 
+                        className: `w-3 h-3 rounded-full ${active ? `bg-${color}-500 animate-pulse` : 'bg-gray-300'}`
+                    }),
+                    React.createElement('span', { className: "text-sm" }, label)
+                )
+            );
+
+            // Dashboard Tab
             const DashboardTab = () => (
                 React.createElement('div', { className: "p-4 space-y-4 pb-20" },
-                    // Environment Status
-                    React.createElement('div', { 
-                        className: `p-4 rounded-lg border-2 ${
-                            isNativeApp ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-                        }`
-                    },
-                        React.createElement('div', { className: "flex items-center space-x-2" },
-                            isNativeApp ? 
-                                React.createElement(Smartphone, { className: "text-green-600" }) :
-                                React.createElement(Globe, { className: "text-yellow-600" }),
-                            React.createElement('div', null,
-                                React.createElement('span', { className: "font-medium block" },
-                                    isNativeApp ? 'Aplikacja natywna' : 'Tryb demo'
-                                ),
-                                React.createElement('span', { className: "text-sm text-gray-700" },
-                                    isNativeApp 
-                                        ? `Platforma: ${window.Capacitor?.getPlatform() || 'unknown'}` 
-                                        : 'Symulacja danych BMS - uruchom jako natywną aplikację'
-                                )
-                            )
-                        )
-                    ),
-
-                    // Bluetooth Status (only for native)
-                    isNativeApp && React.createElement('div', { 
-                        className: `p-4 rounded-lg border-2 ${
-                            isBluetoothEnabled ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-                        }`
-                    },
-                        React.createElement('div', { className: "flex items-center justify-between" },
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement(Bluetooth, { 
-                                    className: isBluetoothEnabled ? "text-green-600" : "text-yellow-600" 
-                                }),
-                                React.createElement('div', null,
-                                    React.createElement('span', { className: "font-medium block" },
-                                        isBluetoothEnabled ? 'Bluetooth włączony' : 'Bluetooth wyłączony'
-                                    ),
-                                    React.createElement('span', { className: "text-sm text-gray-700" },
-                                        isBluetoothEnabled 
-                                            ? 'Gotowy do skanowania urządzeń BMS' 
-                                            : 'Włącz Bluetooth w ustawieniach systemu'
-                                    )
-                                )
-                            ),
-                            !isBluetoothEnabled && React.createElement('button', {
-                                onClick: enableBluetooth,
-                                className: "px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 button-press"
-                            }, 'Włącz')
-                        )
-                    ),
-
                     // Connection Status
-                    React.createElement('div', { 
+                    (isConnected || connectionError) && React.createElement('div', { 
                         className: `p-4 rounded-lg border-2 ${
                             isConnected ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                         }`
@@ -744,30 +1166,24 @@
                                 React.createElement('div', null,
                                     React.createElement('span', { className: "font-medium block" },
                                         isConnecting ? 'Łączenie...' : 
-                                        isConnected ? 'Połączono z BMS' : 
-                                        isNativeApp ? 'Brak połączenia' : 'Tryb demo'
+                                        isConnected ? 'Połączono z BMS' : 'Brak połączenia'
                                     ),
-                                    React.createElement('div', { className: "text-sm text-gray-600" },
+                                    isConnected && React.createElement('div', { className: "text-sm text-gray-600" },
                                         React.createElement('div', null, bmsData.deviceName),
                                         React.createElement('div', null, bmsData.bmsType)
                                     )
                                 )
                             ),
                             React.createElement('div', { className: "flex space-x-2" },
-                                React.createElement('button', {
+                                isConnected && React.createElement('button', {
                                     onClick: refreshData,
-                                    className: "p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 button-press",
+                                    className: "p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors",
                                     title: "Odśwież dane"
                                 }, React.createElement(RefreshCw, { size: 16 })),
-                                React.createElement('button', {
-                                    onClick: isConnected ? disconnectFromBMS : scanForBMSDevices,
-                                    disabled: isConnecting || (!isNativeApp && !isConnected) || (isNativeApp && !isBluetoothEnabled),
-                                    className: `px-4 py-2 rounded-lg font-medium button-press ${
-                                        isConnected 
-                                            ? 'bg-red-600 text-white hover:bg-red-700' 
-                                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                                    } disabled:opacity-50`
-                                }, isConnecting ? 'Łączenie...' : isConnected ? 'Rozłącz' : 'Skanuj BMS')
+                                isConnected && React.createElement('button', {
+                                    onClick: disconnectFromBMS,
+                                    className: "px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                }, 'Rozłącz')
                             )
                         ),
                         connectionError && React.createElement('div', { 
@@ -778,26 +1194,17 @@
                         )
                     ),
 
-                    // Discovered Devices
-                    discoveredDevices.length > 0 && React.createElement('div', { className: "space-y-3" },
-                        React.createElement('div', { className: "flex justify-between items-center" },
-                            React.createElement('h3', { className: "font-medium text-gray-900" }, 'Wykryte urządzenia BMS'),
-                            isConnecting && React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement(RefreshCw, { className: "animate-spin text-blue-600", size: 16 }),
-                                React.createElement('span', { className: "text-sm text-blue-600" }, 'Skanowanie...')
-                            )
-                        ),
-                        ...discoveredDevices.map((device) => 
-                            React.createElement(DeviceCard, {
-                                key: device.deviceId,
-                                device: device,
-                                onConnect: connectToDevice
-                            })
-                        )
+                    // No Connection Message
+                    !isConnected && !connectionError && React.createElement('div', { 
+                        className: "p-4 rounded-lg border-2 bg-gray-50 border-gray-200 text-center"
+                    },
+                        React.createElement(AlertCircle, { className: "mx-auto text-gray-400 mb-2" }),
+                        React.createElement('h3', { className: "font-medium text-gray-700 mb-1" }, 'Brak połączenia z BMS'),
+                        React.createElement('p', { className: "text-sm text-gray-500" }, 'Przejdź do Ustawień aby połączyć się z urządzeniem BMS')
                     ),
 
-                    // Main Parameters Grid
-                    React.createElement('div', { className: "grid grid-cols-2 gap-4" },
+                    // Main Parameters - only when connected
+                    isConnected && React.createElement('div', { className: "grid grid-cols-2 gap-4" },
                         React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
                             React.createElement('div', { className: "flex items-center space-x-2 mb-2" },
                                 React.createElement(Zap, { className: "text-yellow-600" }),
@@ -840,7 +1247,7 @@
                                 React.createElement('span', { className: "text-sm font-medium text-gray-600" }, 'Temperatura')
                             ),
                             React.createElement('div', { className: "text-2xl font-bold text-gray-900" }, 
-                                `${bmsData.temperature.toFixed(1)} °C`
+                                `${bmsData.temperature.toFixed(1)}°C`
                             ),
                             React.createElement('div', { className: "text-xs text-gray-500 mt-1" }, 
                                 'Temperatura BMS'
@@ -848,8 +1255,8 @@
                         )
                     ),
 
-                    // Battery Level
-                    React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                    // Battery Level - only when connected
+                    isConnected && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
                         React.createElement('div', { className: "flex items-center space-x-2 mb-3" },
                             React.createElement(Battery, { className: "text-green-600" }),
                             React.createElement('span', { className: "font-medium text-gray-600" }, 'Stan naładowania')
@@ -866,33 +1273,30 @@
                             })
                         ),
                         React.createElement('div', { className: "flex justify-between text-sm" },
-                            React.createElement('span', { className: "font-semibold" }, `${bmsData.soc}%`),
+                            React.createElement('span', { className: "font-semibold" }, `${bmsData.soc.toFixed(0)}%`),
                             React.createElement('span', null, `${bmsData.remainingCapacity.toFixed(1)} / ${bmsData.capacity.toFixed(1)} Ah`)
                         )
                     ),
 
-                    // System Status
-                    React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                    // System Status - only when connected
+                    isConnected && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
                         React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Status systemu'),
                         React.createElement('div', { className: "grid grid-cols-2 gap-3" },
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.charging ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Ładowanie')
-                            ),
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.discharging ? 'bg-orange-500 animate-pulse' : 'bg-gray-300'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Rozładowanie')
-                            ),
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.balancing ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Balansowanie')
-                            ),
+                            React.createElement(StatusBadge, { 
+                                active: bmsData.charging, 
+                                label: "Ładowanie", 
+                                color: "green" 
+                            }),
+                            React.createElement(StatusBadge, { 
+                                active: bmsData.discharging, 
+                                label: "Rozładowanie", 
+                                color: "orange" 
+                            }),
+                            React.createElement(StatusBadge, { 
+                                active: bmsData.balancing, 
+                                label: "Balansowanie", 
+                                color: "blue" 
+                            }),
                             React.createElement('div', { className: "flex items-center space-x-2" },
                                 React.createElement('div', { className: "w-3 h-3 bg-purple-500 rounded-full" }),
                                 React.createElement('span', { className: "text-sm" }, `Cykle: ${bmsData.cycles}`)
@@ -900,37 +1304,47 @@
                         )
                     ),
 
-                    // Protection Status
-                    React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                    // Protection Status - only when connected
+                    isConnected && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
                         React.createElement('div', { className: "flex items-center space-x-2 mb-3" },
                             React.createElement(Shield, { className: "text-orange-600" }),
                             React.createElement('span', { className: "font-medium text-gray-600" }, 'Zabezpieczenia')
                         ),
                         React.createElement('div', { className: "grid grid-cols-2 gap-2" },
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.protection.overvoltage ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Przepięcie')
-                            ),
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.protection.undervoltage ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Niedopięcie')
-                            ),
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.protection.overcurrent ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Nadprąd')
-                            ),
-                            React.createElement('div', { className: "flex items-center space-x-2" },
-                                React.createElement('div', { 
-                                    className: `w-3 h-3 rounded-full ${bmsData.protection.overtemperature ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`
-                                }),
-                                React.createElement('span', { className: "text-sm" }, 'Przegrzanie')
-                            )
+                            React.createElement(StatusBadge, { 
+                                active: !bmsData.protection.overvoltage, 
+                                label: "Przepięcie", 
+                                color: bmsData.protection.overvoltage ? "red" : "green" 
+                            }),
+                            React.createElement(StatusBadge, { 
+                                active: !bmsData.protection.undervoltage, 
+                                label: "Niedopięcie", 
+                                color: bmsData.protection.undervoltage ? "red" : "green" 
+                            }),
+                            React.createElement(StatusBadge, { 
+                                active: !bmsData.protection.overcurrent, 
+                                label: "Nadprąd", 
+                                color: bmsData.protection.overcurrent ? "red" : "green" 
+                            }),
+                            React.createElement(StatusBadge, { 
+                                active: !bmsData.protection.overtemperature, 
+                                label: "Przegrzanie", 
+                                color: bmsData.protection.overtemperature ? "red" : "green" 
+                            })
+                        )
+                    ),
+
+                    // Raw Data Display - only when connected and has data
+                    isConnected && bmsData.rawData && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                        React.createElement('div', { className: "flex items-center justify-between mb-3" },
+                            React.createElement('h3', { className: "font-medium text-gray-900" }, 'Surowe dane (hex)'),
+                            React.createElement('button', {
+                                onClick: () => setShowRawData(!showRawData),
+                                className: "p-1 text-gray-500 hover:text-gray-700"
+                            }, showRawData ? React.createElement(EyeOff, { size: 16 }) : React.createElement(Eye, { size: 16 }))
+                        ),
+                        showRawData && React.createElement('div', { className: "bg-gray-100 p-3 rounded font-mono text-xs overflow-x-auto" },
+                            bmsData.rawData
                         )
                     )
                 )
@@ -944,11 +1358,21 @@
                         React.createElement('span', { className: "text-sm text-gray-500" }, `${bmsData.cells.length} ogniw`)
                     ),
                     
-                    bmsData.cells.length === 0 ? 
+                    !isConnected ? 
                         React.createElement('div', { className: "text-center py-12 text-gray-500" },
                             React.createElement(Battery, { size: 48, className: "mx-auto mb-4 opacity-50" }),
-                            React.createElement('h3', { className: "text-lg font-medium mb-2" }, 'Brak danych o ogniwach'),
-                            React.createElement('p', { className: "text-sm" }, 'Połącz się z BMS aby zobaczyć napięcia ogniw')
+                            React.createElement('h3', { className: "text-lg font-medium mb-2" }, 'Brak połączenia z BMS'),
+                            React.createElement('p', { className: "text-sm" }, 'Połącz się z BMS w ustawieniach aby zobaczyć napięcia ogniw')
+                        ) :
+                        bmsData.cells.length === 0 ?
+                        React.createElement('div', { className: "text-center py-12 text-gray-500" },
+                            React.createElement(Battery, { size: 48, className: "mx-auto mb-4 opacity-50" }),
+                            React.createElement('h3', { className: "text-lg font-medium mb-2" }, 'Ładowanie danych ogniw...'),
+                            React.createElement('p', { className: "text-sm" }, 'Odczytywanie napięć ogniw z BMS'),
+                            React.createElement('button', {
+                                onClick: refreshData,
+                                className: "mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            }, 'Odśwież dane')
                         ) :
                         React.createElement('div', { className: "space-y-3" },
                             // Cell Statistics Header
@@ -1038,14 +1462,64 @@
                 )
             );
 
-            // Settings Tab Component
+            // Settings Tab
             const SettingsTab = () => (
                 React.createElement('div', { className: "p-4 space-y-4 pb-20" },
                     React.createElement('h2', { className: "text-lg font-bold text-gray-900" }, 'Ustawienia'),
                     
+                    // Connection Section
+                    React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Połączenie BMS'),
+                        
+                        // Current connection status
+                        isConnected ? React.createElement('div', { className: "mb-4 p-3 bg-green-50 border border-green-200 rounded-lg" },
+                            React.createElement('div', { className: "flex items-center justify-between" },
+                                React.createElement('div', null,
+                                    React.createElement('div', { className: "font-medium text-green-800" }, `Połączono: ${bmsData.deviceName}`),
+                                    React.createElement('div', { className: "text-sm text-green-600" }, bmsData.bmsType)
+                                ),
+                                React.createElement('button', {
+                                    onClick: disconnectFromBMS,
+                                    className: "px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                                }, 'Rozłącz')
+                            )
+                        ) : React.createElement('div', { className: "mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg" },
+                            React.createElement('div', { className: "text-gray-600" }, 'Brak połączenia z BMS')
+                        ),
+                        
+                        // Scan button
+                        React.createElement('button', {
+                            onClick: scanForBMSDevices,
+                            disabled: !isNativeApp || !isBluetoothEnabled || isScanning,
+                            className: "w-full flex items-center justify-center space-x-2 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        },
+                            isScanning ? React.createElement(RefreshCw, { size: 16, className: "animate-spin" }) : React.createElement(Search, { size: 16 }),
+                            React.createElement('span', null, isScanning ? 'Skanowanie...' : 'Skanuj urządzenia BMS')
+                        ),
+                        
+                        // Error message
+                        connectionError && React.createElement('div', { 
+                            className: "mt-3 text-sm text-red-600 bg-red-100 p-2 rounded" 
+                        }, connectionError)
+                    ),
+
+                    // Discovered Devices
+                    discoveredDevices.length > 0 && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Wykryte urządzenia'),
+                        React.createElement('div', { className: "space-y-2" },
+                            ...discoveredDevices.map((device) => 
+                                React.createElement(DeviceCard, {
+                                    key: device.deviceId,
+                                    device: device,
+                                    onConnect: connectToDevice
+                                })
+                            )
+                        )
+                    ),
+                    
                     // Device Information
                     React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
-                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Informacje o urządzeniu'),
+                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Informacje o aplikacji'),
                         React.createElement('div', { className: "space-y-3 text-sm" },
                             React.createElement('div', { className: "flex justify-between items-center" },
                                 React.createElement('span', { className: "text-gray-600" }, 'Platforma:'),
@@ -1065,15 +1539,7 @@
                                 )
                             ),
                             React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('span', { className: "text-gray-600" }, 'BMS:'),
-                                React.createElement('span', { className: "font-medium" }, bmsData.deviceName)
-                            ),
-                            React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('span', { className: "text-gray-600" }, 'Protokół:'),
-                                React.createElement('span', { className: "font-medium" }, bmsData.bmsType)
-                            ),
-                            React.createElement('div', { className: "flex justify-between items-center" },
-                                React.createElement('span', { className: "text-gray-600" }, 'Połączenie:'),
+                                React.createElement('span', { className: "text-gray-600" }, 'Status:'),
                                 React.createElement('div', { className: "flex items-center space-x-2" },
                                     React.createElement('div', { 
                                         className: `w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`
@@ -1092,65 +1558,57 @@
                         React.createElement('div', { className: "grid grid-cols-1 gap-3" },
                             React.createElement('button', {
                                 onClick: refreshData,
-                                className: "flex items-center justify-center space-x-2 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 button-press"
+                                disabled: !isConnected,
+                                className: "flex items-center justify-center space-x-2 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             },
                                 React.createElement(RefreshCw, { size: 16 }),
                                 React.createElement('span', null, 'Odśwież dane')
-                            ),
-                            
-                            React.createElement('button', {
-                                onClick: scanForBMSDevices,
-                                disabled: !isNativeApp || !isBluetoothEnabled || isConnecting,
-                                className: "flex items-center justify-center space-x-2 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed button-press"
-                            },
-                                React.createElement(Search, { size: 16 }),
-                                React.createElement('span', null, 'Skanuj urządzenia BMS')
-                            ),
-                            
-                            isConnected && React.createElement('button', {
-                                onClick: disconnectFromBMS,
-                                className: "flex items-center justify-center space-x-2 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 button-press"
-                            },
-                                React.createElement('svg', { 
-                                    width: 16, 
-                                    height: 16, 
-                                    viewBox: "0 0 24 24", 
-                                    fill: "none", 
-                                    stroke: "currentColor", 
-                                    strokeWidth: "2" 
-                                },
-                                    React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
-                                    React.createElement('path', { d: "m15 9-6 6" }),
-                                    React.createElement('path', { d: "m9 9 6 6" })
-                                ),
-                                React.createElement('span', null, 'Rozłącz od BMS')
                             )
                         )
                     ),
 
-                    // BMS Data Summary
+                    // Debug Information - only when connected and has data
+                    isConnected && bmsData.rawData && React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
+                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Informacje diagnostyczne'),
+                        React.createElement('div', { className: "space-y-2 text-sm" },
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', { className: "text-gray-600" }, 'Ostatnie dane:'),
+                                React.createElement('span', { className: "font-mono text-xs" }, bmsData.rawData.substring(0, 20) + '...')
+                            ),
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', { className: "text-gray-600" }, 'Długość danych:'),
+                                React.createElement('span', { className: "font-medium" }, `${bmsData.rawData.split(' ').length} bajtów`)
+                            ),
+                            lastUpdate && React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', { className: "text-gray-600" }, 'Ostatnia aktualizacja:'),
+                                React.createElement('span', { className: "font-medium" }, lastUpdate.toLocaleTimeString())
+                            )
+                        )
+                    ),
+
+                    // Protocol Information
                     React.createElement('div', { className: "bg-white p-4 rounded-lg border shadow-sm" },
-                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Podsumowanie danych'),
-                        React.createElement('div', { className: "grid grid-cols-2 gap-3 text-sm" },
-                            React.createElement('div', { className: "bg-gray-50 p-3 rounded" },
-                                React.createElement('div', { className: "text-gray-600 text-xs" }, 'Ogniwa'),
-                                React.createElement('div', { className: "text-lg font-bold" }, bmsData.cells.length)
+                        React.createElement('h3', { className: "font-medium text-gray-900 mb-3" }, 'Obsługiwane protokoły'),
+                        React.createElement('div', { className: "space-y-2 text-sm" },
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', null, 'Xiaoxiang BMS:'),
+                                React.createElement('span', { className: "text-green-600" }, '✓ Pełna obsługa')
                             ),
-                            React.createElement('div', { className: "bg-gray-50 p-3 rounded" },
-                                React.createElement('div', { className: "text-gray-600 text-xs" }, 'Cykle'),
-                                React.createElement('div', { className: "text-lg font-bold" }, bmsData.cycles)
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', null, 'JK BMS:'),
+                                React.createElement('span', { className: "text-green-600" }, '✓ Podstawowa')
                             ),
-                            React.createElement('div', { className: "bg-gray-50 p-3 rounded" },
-                                React.createElement('div', { className: "text-gray-600 text-xs" }, 'Ostatnia aktual.'),
-                                React.createElement('div', { className: "text-sm font-medium" }, 
-                                    lastUpdate ? lastUpdate.toLocaleTimeString() : 'Brak'
-                                )
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', null, 'DALY BMS:'),
+                                React.createElement('span', { className: "text-green-600" }, '✓ Podstawowa')
                             ),
-                            React.createElement('div', { className: "bg-gray-50 p-3 rounded" },
-                                React.createElement('div', { className: "text-gray-600 text-xs" }, 'Status'),
-                                React.createElement('div', { className: "text-sm font-medium" }, 
-                                    isConnected ? 'Online' : 'Offline'
-                                )
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', null, 'ANT BMS:'),
+                                React.createElement('span', { className: "text-yellow-600" }, '~ Częściowo')
+                            ),
+                            React.createElement('div', { className: "flex justify-between" },
+                                React.createElement('span', null, 'SEPLOS/PACE/LLT:'),
+                                React.createElement('span', { className: "text-yellow-600" }, '~ Częściowo')
                             )
                         )
                     ),
@@ -1159,10 +1617,10 @@
                     React.createElement('div', { className: "bg-gray-100 p-4 rounded-lg" },
                         React.createElement('h3', { className: "font-medium text-gray-700 mb-2" }, 'O aplikacji'),
                         React.createElement('p', { className: "text-sm text-gray-600 mb-2" }, 
-                            'BMS Reader v1.0'
+                            'BMS Reader v4.1 - Naprawiono skanowanie i przywrócono ogniwa'
                         ),
                         React.createElement('p', { className: "text-xs text-gray-500" },
-                            'Monitor systemów zarządzania baterią. Obsługuje protokoły: Xiaoxiang, JK BMS, DALY, ANT, SEPLOS, PACE, LLT Power.'
+                            'Monitor systemów zarządzania baterią LiFePO4 z prawdziwymi danymi przez Bluetooth LE. Poprawiono callback skanowania, przywrócono zakładkę ogniw i naprawiono komunikację z BMS. Obsługuje protokoły Xiaoxiang, JK BMS, DALY i inne.'
                         )
                     )
                 )
@@ -1184,16 +1642,22 @@
 
             // Show loading screen while initializing
             if (isLoading) {
-                return LoadingScreen();
+                return React.createElement('div', { className: "h-screen flex items-center justify-center bg-blue-600 text-white" },
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('div', { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" }),
+                        React.createElement('h1', { className: "text-2xl font-bold mb-2" }, 'BMS Reader'),
+                        React.createElement('p', { className: "text-blue-100" }, 'Inicjalizacja...')
+                    )
+                );
             }
 
             // Main app render
-            return React.createElement('div', { className: "h-screen bg-gray-50 flex flex-col fade-in" },
+            return React.createElement('div', { className: "h-screen bg-gray-50 flex flex-col" },
                 // Header
-                React.createElement('div', { className: "bg-blue-600 text-white p-4 safe-area-top shadow-lg" },
+                React.createElement('div', { className: "bg-blue-600 text-white p-4 shadow-lg safe-area-top" },
                     React.createElement('h1', { className: "text-xl font-bold text-center" }, 'BMS Reader'),
                     React.createElement('p', { className: "text-center text-blue-100 text-sm" }, 
-                        isNativeApp ? 'Monitor systemów BMS' : 'Tryb demonstracyjny'
+                        'Monitor BMS LiFePO4 v4.1 - FIXED'
                     )
                 ),
 
@@ -1231,18 +1695,25 @@
             );
         };
 
-        // Initialize app
-        console.log('Initializing BMSReaderApp...');
-        
-        // Wait for DOM to be ready
+        // FIXED: Initialize app with React 18 createRoot
+        console.log('🚀 Initializing BMS Reader App with React 18...');
+
         const initApp = () => {
-            console.log('DOM ready, mounting React app...');
+            console.log('📱 DOM ready, mounting React app...');
             const rootElement = document.getElementById('root');
             if (rootElement) {
-                ReactDOM.render(React.createElement(BMSReaderApp), rootElement);
-                console.log('App mounted successfully');
+                // Use React 18 createRoot instead of ReactDOM.render
+                if (ReactDOM.createRoot) {
+                    console.log('✅ Using React 18 createRoot');
+                    const root = ReactDOM.createRoot(rootElement);
+                    root.render(React.createElement(BMSReaderApp));
+                } else {
+                    console.log('⚠️ Falling back to ReactDOM.render');
+                    ReactDOM.render(React.createElement(BMSReaderApp), rootElement);
+                }
+                console.log('✅ App mounted successfully');
             } else {
-                console.error('Root element not found!');
+                console.error('❌ Root element not found!');
             }
         };
 
@@ -1257,17 +1728,17 @@
         setTimeout(() => {
             const rootElement = document.getElementById('root');
             if (rootElement && !rootElement.hasChildNodes()) {
-                console.log('Fallback initialization...');
+                console.log('🔄 Fallback initialization...');
                 initApp();
             }
         }, 100);
 
         // Handle device ready for Capacitor
         document.addEventListener('deviceready', () => {
-            console.log('Capacitor device ready');
+            console.log('📱 Capacitor device ready');
         });
 
-        // Prevent zoom on double tap (iOS Safari)
+        // Mobile optimizations
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function (event) {
             const now = (new Date()).getTime();
@@ -1279,7 +1750,6 @@
 
         // Handle window resize for mobile keyboards
         window.addEventListener('resize', () => {
-            // Force recalculation of viewport height for mobile browsers
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         });
@@ -1288,17 +1758,7 @@
         const vh = window.innerHeight * 0.01;
         document.documentElement.style.setProperty('--vh', `${vh}px`);
 
-        // Status bar styling for Capacitor
-        if (window.StatusBar) {
-            window.StatusBar.styleDefault();
-        }
-
-        // Keyboard handling for Capacitor
-        if (window.Keyboard) {
-            window.Keyboard.setAccessoryBarVisible(false);
-        }
-
-        console.log('Script initialization completed');
+        console.log('✅ Script initialization completed');
     </script>
 </body>
 </html>
