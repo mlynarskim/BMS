@@ -1,10 +1,11 @@
 import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
+import { createRoot } from 'react-dom/client'
+import BMSReaderApp from './App'
 import './index.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// React 19 compatible
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element not found');
+
+const root = createRoot(container);
+root.render(<BMSReaderApp />);
