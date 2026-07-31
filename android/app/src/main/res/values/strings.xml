@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BMS Reader</string>
+    <string name="title_activity_main">BMS Reader</string>
+    <string name="package_name">com.bmsreader.app</string>
+    <string name="custom_url_scheme">com.bmsreader.app</string>
+</resources>
