@@ -4,6 +4,7 @@ import './index.css'
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element not found');
+let booting = true;
 
 const errorText = (reason: unknown): string => {
   if (reason instanceof Error) return reason.message;
@@ -38,15 +39,16 @@ const showFatalError = (reason: unknown): void => {
 };
 
 window.addEventListener('error', (event) => {
-  showFatalError(event.error ?? event.message);
+  if (booting) showFatalError(event.error ?? event.message);
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  showFatalError(event.reason);
+  if (booting) showFatalError(event.reason);
 });
 
 try {
   createRoot(container).render(<BMSReaderApp />);
+  requestAnimationFrame(() => { booting = false; });
 } catch (error) {
   showFatalError(error);
 }

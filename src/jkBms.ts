@@ -212,16 +212,17 @@ export function isValidJkFrame(frame: Uint8Array): boolean {
 
 export function parseJkFrame(frame: Uint8Array, protocolHint?: JkProtocol): JkParsedFrame {
   if (!isValidJkFrame(frame)) throw new Error('Odebrana ramka JK ma nieprawidłową sumę kontrolną.');
-  if (frame[4] === 0x02) return { type: 'status', value: parseJkStatusFrame(frame) };
+  if (frame[4] === 0x02) return { type: 'status', value: parseJkStatusFrame(frame, protocolHint) };
   if (frame[4] === 0x01) return { type: 'settings', value: parseJkSettingsFrame(frame) };
   if (frame[4] === 0x03) return { type: 'device', value: parseJkDeviceInfoFrame(frame) };
   if (frame[4] === 0x05) return { type: 'log', rawData: toHex(frame) };
   throw new Error(`Nieobsługiwany typ ramki JK ${frame[4]} dla ${protocolHint ?? 'nierozpoznanego protokołu'}.`);
 }
 
-export function parseJkStatusFrame(frame: Uint8Array): JkBatteryData {
-  const candidates = [parseStatusCandidate(frame, 24, 0, 'JK02 24S'), parseStatusCandidate(frame, 32, 32, 'JK02 32S')].sort((a, b) => b.score - a.score);
-  const selected = candidates[0];
+export function parseJkStatusFrame(frame: Uint8Array, protocolHint?: JkProtocol): JkBatteryData {
+  const candidates = [parseStatusCandidate(frame, 24, 0, 'JK02 24S'), parseStatusCandidate(frame, 32, 32, 'JK02 32S')];
+  const hinted = protocolHint ? candidates.find((candidate) => candidate.protocol === protocolHint) : undefined;
+  const selected = hinted && hinted.score >= 10 ? hinted : candidates.sort((a, b) => b.score - a.score)[0];
   if (!selected || selected.score < 10) throw new Error('Nie udało się rozpoznać wersji protokołu JK.');
   const { score, ...data } = selected;
   void score;
@@ -239,7 +240,8 @@ function parseStatusCandidate(frame: Uint8Array, slots: 24 | 32, dataOffset: 0 |
     }
   }
   const voltage = readUint32LE(frame, 118 + dataOffset) * 0.001;
-  const current = readInt32LE(frame, 126 + dataOffset) * 0.001;
+  const measuredCurrent = readInt32LE(frame, 126 + dataOffset) * 0.001;
+  const current = Math.abs(measuredCurrent) < 0.05 ? 0 : measuredCurrent;
   const temperatures = [readInt16LE(frame, 130 + dataOffset) * 0.1, readInt16LE(frame, 132 + dataOffset) * 0.1].filter(isPlausibleTemperature);
   const mosTemperature = slots === 32 ? readInt16LE(frame, 144) * 0.1 : readInt16LE(frame, 134) * 0.1;
   const errorMask = slots === 32 ? readUint32LE(frame, 166) : readUint16LE(frame, 136);
