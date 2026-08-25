@@ -4,18 +4,20 @@ import { BleClient, type BleService, type ScanResult } from '@capacitor-communit
 import {
   Activity, AlertTriangle, BatteryMedium, Bluetooth, ChartNoAxesCombined,
   Check, ChevronRight, CircleGauge, CircleHelp, Clock3, Download, FileText, Gauge, History, Languages,
-  LayoutDashboard, LockKeyhole, Radio, RefreshCw, Save, Search, Settings,
+  LayoutDashboard, LockKeyhole, Radio, RefreshCw, RotateCcw, Save, Search, Settings, Upload,
   ShieldCheck, SlidersHorizontal, Thermometer, Unplug, X, Zap, type LucideIcon,
 } from 'lucide-react';
 import {
   JK_SETTING_DEFINITIONS, JkFrameAssembler, buildSettingWrite, parseJkFrame,
   selectJkGattPath, writeJkCommand, type JkBatteryData, type JkDeviceInfo,
-  type JkGattPath, type JkSettingDefinition, type JkSettingKey, type JkSettings,
+  type JkGattPath, type JkProtocol, type JkSettingDefinition, type JkSettingKey, type JkSettings,
 } from './jkBms';
 import { APP_VERSION } from './version';
 
 interface FoundDevice { name: string; deviceId: string; rssi: number }
 interface HistoryPoint { time: number; soc: number; voltage: number; current: number; temperature: number }
+interface SettingsBackup { savedAt: number; protocol: JkProtocol; device?: string; settings: JkSettings }
+interface LowTemperatureChange { protectionEnabled: boolean; protection: number; recovery: number }
 type Tab = 'dashboard' | 'cells' | 'history' | 'settings';
 type ConnectionState = 'initializing' | 'ready' | 'scanning' | 'connecting' | 'connected' | 'disconnected' | 'error';
 type Language = 'pl' | 'en';
@@ -24,7 +26,13 @@ type LegalDocument = 'privacy' | 'terms';
 const HISTORY_KEY = 'jk_bms_history_v2';
 const BACKUP_KEY = 'jk_bms_settings_backup_v1';
 const LANGUAGE_KEY = 'jk_bms_language_v1';
+const SETTINGS_CODE = '123456';
 const HISTORY_LIMIT = 720;
+const CONTROL_SETTING_KEYS = new Set<JkSettingKey>(['chargingEnabled', 'dischargingEnabled']);
+const LOW_TEMPERATURE_SETTING_KEYS = new Set<JkSettingKey>(['chargeUnderTemperature', 'chargeUnderTemperatureRecovery']);
+const CONTROL_SETTINGS = JK_SETTING_DEFINITIONS.filter((definition) => CONTROL_SETTING_KEYS.has(definition.key));
+const LOW_TEMPERATURE_SETTINGS = JK_SETTING_DEFINITIONS.filter((definition) => LOW_TEMPERATURE_SETTING_KEYS.has(definition.key));
+const OTHER_SETTINGS = JK_SETTING_DEFINITIONS.filter((definition) => !CONTROL_SETTING_KEYS.has(definition.key) && !LOW_TEMPERATURE_SETTING_KEYS.has(definition.key));
 const tr = (language: Language, polish: string, english: string) => language === 'pl' ? polish : english;
 const toErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
 const isJkName = (name: string) => /JK|JIKONG|BMS/i.test(name);
@@ -52,6 +60,23 @@ const loadHistory = (): HistoryPoint[] => {
   try { const value = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); return Array.isArray(value) ? value.slice(-HISTORY_LIMIT) : []; }
   catch { return []; }
 };
+const parseBackup = (raw: string): SettingsBackup => {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object') throw new Error('Invalid backup file.');
+  const backup = parsed as Partial<SettingsBackup>;
+  if (!backup.settings || typeof backup.settings !== 'object' || !backup.savedAt || (backup.protocol !== 'JK02 24S' && backup.protocol !== 'JK02 32S')) throw new Error('Invalid backup file.');
+  for (const definition of JK_SETTING_DEFINITIONS) {
+    const value = backup.settings[definition.key];
+    const valid = definition.kind === 'switch'
+      ? typeof value === 'boolean'
+      : typeof value === 'number' && Number.isFinite(value) && value >= definition.min && value <= definition.max;
+    if (!valid) throw new Error(`Invalid value for ${definition.key}.`);
+  }
+  return backup as SettingsBackup;
+};
+const backupToDraft = (backup: SettingsBackup): Partial<Record<JkSettingKey, number | boolean>> => Object.fromEntries(
+  JK_SETTING_DEFINITIONS.map((definition) => [definition.key, backup.settings[definition.key]]),
+);
 
 function App() {
   const [language, setLanguage] = useState<Language>(() => {
@@ -77,6 +102,7 @@ function App() {
   const [expertUnlocked, setExpertUnlocked] = useState(false);
   const [draft, setDraft] = useState<Partial<Record<JkSettingKey, number | boolean>>>({});
   const [pendingWrite, setPendingWrite] = useState<JkSettingDefinition | null>(null);
+  const [pendingLowTemperature, setPendingLowTemperature] = useState<LowTemperatureChange | null>(null);
   const [writeMessage, setWriteMessage] = useState('');
   const [writing, setWriting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,12 +125,14 @@ function App() {
   const batteryRef = useRef<JkBatteryData | null>(null);
   const draftRef = useRef<Partial<Record<JkSettingKey, number | boolean>>>({});
   const pendingWriteRef = useRef<JkSettingDefinition | null>(null);
+  const pendingLowTemperatureRef = useRef<LowTemperatureChange | null>(null);
   const writingRef = useRef(false);
 
   useEffect(() => { batteryRef.current = battery; }, [battery]);
   useEffect(() => { languageRef.current = language; }, [language]);
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { pendingWriteRef.current = pendingWrite; }, [pendingWrite]);
+  useEffect(() => { pendingLowTemperatureRef.current = pendingLowTemperature; }, [pendingLowTemperature]);
   useEffect(() => { writingRef.current = writing; }, [writing]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   useEffect(() => {
@@ -151,8 +179,17 @@ function App() {
         else if (parsed.type === 'settings') {
           setBmsSettings(parsed.value);
           setDraft((current) => Object.keys(current).length ? current : Object.fromEntries(JK_SETTING_DEFINITIONS.map((definition) => [definition.key, parsed.value[definition.key]])));
+          const lowTemperatureWrite = pendingLowTemperatureRef.current;
           const activeWrite = pendingWriteRef.current;
-          if (writingRef.current && activeWrite) {
+          if (writingRef.current && lowTemperatureWrite) {
+            const protectionConfirmed = Math.abs(parsed.value.chargeUnderTemperature - lowTemperatureWrite.protection) < 0.05;
+            const recoveryConfirmed = Math.abs(parsed.value.chargeUnderTemperatureRecovery - lowTemperatureWrite.recovery) < 0.05;
+            if (protectionConfirmed && recoveryConfirmed) {
+              writingRef.current = false; pendingLowTemperatureRef.current = null;
+              setWriteMessage(tr(languageRef.current, 'Ustawienie ładowania w niskiej temperaturze zostało potwierdzone przez BMS.', 'The low temperature charging setting was confirmed by the BMS.'));
+              setWriting(false); setPendingLowTemperature(null);
+            }
+          } else if (writingRef.current && activeWrite) {
             const received = parsed.value[activeWrite.key];
             const expected = draftRef.current[activeWrite.key];
             if (received === expected || (typeof received === 'number' && typeof expected === 'number' && Math.abs(received - expected) < activeWrite.step / 2 + 0.0001)) {
@@ -256,7 +293,7 @@ function App() {
     const current = activeDevice.current; const path = pathRef.current; clearTimers();
     try { if (current && path) await BleClient.stopNotifications(current.deviceId, path.service, path.notify); } catch { /* Stan zostanie wyczyszczony lokalnie. */ }
     try { if (current) await BleClient.disconnect(current.deviceId); } catch { /* Stan zostanie wyczyszczony lokalnie. */ }
-    resetConnection(); setBattery(null); setBmsSettings(null); setDeviceInfo(null); setLastDataAt(null); setExpertUnlocked(false); setDraft({});
+    resetConnection(); setBattery(null); setBmsSettings(null); setDeviceInfo(null); setLastDataAt(null); setExpertUnlocked(false); setDraft({}); setPendingWrite(null); setPendingLowTemperature(null);
   }, [clearTimers, resetConnection]);
 
   const requestRefresh = useCallback(async () => {
@@ -296,13 +333,103 @@ function App() {
     } catch (writeError) { writingRef.current = false; setWriting(false); setWriteMessage(`${tr(language, 'Zapis nie powiódł się', 'Save failed')}: ${toErrorMessage(writeError)}`); }
   }, [battery, bmsSettings, draft, language, pendingWrite]);
 
-  const createBackup = useCallback(() => {
-    if (!bmsSettings || !battery) return;
-    const savedAt = Date.now(); const backup = { savedAt, protocol: battery.protocol, device: deviceInfo?.model || device?.name, settings: bmsSettings };
+  const requestLowTemperatureChange = useCallback((protectionEnabled: boolean) => {
+    setPendingLowTemperature(protectionEnabled
+      ? { protectionEnabled: true, protection: 0, recovery: 5 }
+      : { protectionEnabled: false, protection: -20, recovery: -15 });
+  }, []);
+
+  const confirmLowTemperatureChange = useCallback(async () => {
+    if (!pendingLowTemperature || !battery || !bmsSettings) return;
+    const current = activeDevice.current; const path = pathRef.current;
+    const protectionDefinition = LOW_TEMPERATURE_SETTINGS.find((definition) => definition.key === 'chargeUnderTemperature');
+    const recoveryDefinition = LOW_TEMPERATURE_SETTINGS.find((definition) => definition.key === 'chargeUnderTemperatureRecovery');
+    if (!current || !path || !protectionDefinition || !recoveryDefinition) return;
+    try {
+      pendingLowTemperatureRef.current = pendingLowTemperature; writingRef.current = true; setWriting(true);
+      setWriteMessage(tr(language, 'Zapisywanie dwóch progów temperatury i oczekiwanie na potwierdzenie BMS', 'Saving both temperature thresholds and waiting for BMS confirmation'));
+      const protectionCommand = buildSettingWrite(protectionDefinition, pendingLowTemperature.protection, battery.protocol);
+      const recoveryCommand = buildSettingWrite(recoveryDefinition, pendingLowTemperature.recovery, battery.protocol);
+      await writeJkCommand(BleClient, current.deviceId, path, protectionCommand.register, protectionCommand.value, protectionCommand.length);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await writeJkCommand(BleClient, current.deviceId, path, recoveryCommand.register, recoveryCommand.value, recoveryCommand.length);
+      setDraft((currentDraft) => ({ ...currentDraft, chargeUnderTemperature: pendingLowTemperature.protection, chargeUnderTemperatureRecovery: pendingLowTemperature.recovery }));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await writeJkCommand(BleClient, current.deviceId, path, 0x96);
+      setTimeout(() => {
+        if (mounted.current && writingRef.current && pendingLowTemperatureRef.current) {
+          writingRef.current = false; pendingLowTemperatureRef.current = null; setWriting(false);
+          setWriteMessage(tr(language, 'BMS nie potwierdził obu progów temperatury. Odśwież ustawienia i sprawdź wartości.', 'The BMS did not confirm both temperature thresholds. Refresh settings and verify the values.'));
+        }
+      }, 6000);
+    } catch (writeError) {
+      writingRef.current = false; pendingLowTemperatureRef.current = null; setWriting(false);
+      setWriteMessage(`${tr(language, 'Zapis progów temperatury nie powiódł się', 'Saving the temperature thresholds failed')}: ${toErrorMessage(writeError)}`);
+    }
+  }, [battery, bmsSettings, language, pendingLowTemperature]);
+
+  const unlockSettings = useCallback((code = expertCode) => {
+    if (code === SETTINGS_CODE) {
+      setExpertUnlocked(true); setExpertCode('');
+      setWriteMessage(tr(language, 'Edycja ustawień została odblokowana.', 'Settings editing has been unlocked.'));
+      return;
+    }
+    setWriteMessage(tr(language, 'Nieprawidłowy kod aplikacji. Wpisz 123456.', 'Incorrect app code. Enter 123456.'));
+  }, [expertCode, language]);
+
+  const updateExpertCode = useCallback((value: string) => {
+    const normalized = value.replace(/\D/g, '').slice(0, 6);
+    setExpertCode(normalized); setWriteMessage('');
+    if (normalized.length === 6) unlockSettings(normalized);
+  }, [unlockSettings]);
+
+  const makeBackup = useCallback((): SettingsBackup | null => {
+    if (!bmsSettings || !battery) return null;
+    return { savedAt: Date.now(), protocol: battery.protocol, device: deviceInfo?.model || device?.name, settings: bmsSettings };
+  }, [battery, bmsSettings, device, deviceInfo]);
+
+  const saveBackup = useCallback(() => {
+    const backup = makeBackup();
+    if (!backup) return;
+    const savedAt = backup.savedAt;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(backup)); setBackupAt(savedAt);
+    setWriteMessage(tr(language, 'Kopia została zapisana w prywatnej pamięci aplikacji.', 'The backup was saved in the app private storage.'));
+  }, [language, makeBackup]);
+
+  const exportBackup = useCallback(() => {
+    const backup = makeBackup();
+    if (!backup) return;
+    const savedAt = backup.savedAt;
     localStorage.setItem(BACKUP_KEY, JSON.stringify(backup)); setBackupAt(savedAt);
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `jk-bms-backup-${new Date(savedAt).toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url);
-  }, [battery, bmsSettings, device, deviceInfo]);
+    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `bms-monitor-settings-${new Date(savedAt).toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url);
+    setWriteMessage(tr(language, 'Utworzono plik JSON. Na iPhonie wybierz Zachowaj w Plikach w oknie udostępniania.', 'A JSON file was created. On iPhone, choose Save to Files in the share sheet.'));
+  }, [language, makeBackup]);
+
+  const applyBackup = useCallback((backup: SettingsBackup) => {
+    if (!battery) return;
+    if (backup.protocol !== battery.protocol) {
+      setWriteMessage(tr(language, 'Kopia pochodzi z innej wersji protokołu JK i nie została wczytana.', 'The backup uses a different JK protocol version and was not loaded.'));
+      return;
+    }
+    setDraft(backupToDraft(backup));
+    setWriteMessage(tr(language, 'Kopia została wczytana do edytora. Wartości nie zostały jeszcze wysłane do BMS.', 'The backup was loaded into the editor. Values have not been sent to the BMS yet.'));
+  }, [battery, language]);
+
+  const loadStoredBackup = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (!raw) { setWriteMessage(tr(language, 'Brak lokalnej kopii ustawień.', 'No local settings backup was found.')); return; }
+      applyBackup(parseBackup(raw));
+    } catch {
+      setWriteMessage(tr(language, 'Lokalna kopia jest uszkodzona i nie może zostać wczytana.', 'The local backup is damaged and cannot be loaded.'));
+    }
+  }, [applyBackup, language]);
+
+  const importBackup = useCallback(async (file: File) => {
+    try { applyBackup(parseBackup(await file.text())); }
+    catch { setWriteMessage(tr(language, 'Wybrany plik nie jest prawidłową kopią ustawień tej aplikacji.', 'The selected file is not a valid settings backup for this app.')); }
+  }, [applyBackup, language]);
 
   const freshness = lastDataAt ? now - lastDataAt : Number.POSITIVE_INFINITY;
   const freshLabel = freshness < 10000 ? tr(language, 'Dane aktualne', 'Data up to date') : lastDataAt ? tr(language, 'Dane nieaktualne', 'Data out of date') : tr(language, 'Oczekiwanie na dane', 'Waiting for data');
@@ -313,7 +440,7 @@ function App() {
       <header className="safe-top shrink-0 border-b border-slate-200/80 bg-white/95 px-4 pb-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700">JK BMS</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700">BMS MONITOR</p>
             <h1 className="truncate text-lg font-semibold">{deviceInfo?.deviceName || device?.name || tr(language, 'Monitor baterii', 'Battery monitor')}</h1>
           </div>
           <button disabled={refreshing} onClick={() => connected.current ? void requestRefresh() : setTab('settings')} className="flex h-10 min-w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm disabled:opacity-60" aria-label={tr(language, 'Odśwież lub połącz', 'Refresh or connect')}>
@@ -342,10 +469,11 @@ function App() {
               writeMessage={writeMessage} writing={writing} refreshing={refreshing} language={language}
               onLanguage={setLanguage} onLegal={setLegalDocument}
               onScan={() => void scan()} onConnect={(item) => void connect(item)} onDisconnect={() => void disconnect()}
-              onRefresh={() => void requestRefresh()} onCode={setExpertCode}
-              onUnlock={() => { if (expertCode === '123456') { setExpertUnlocked(true); setWriteMessage(tr(language, 'Tryb zmian został odblokowany.', 'Settings editing has been unlocked.')); } else setWriteMessage(tr(language, 'Nieprawidłowy kod ustawień.', 'Incorrect settings code.')); }}
+              onRefresh={() => void requestRefresh()} onCode={updateExpertCode} onUnlock={() => unlockSettings()}
               onDraft={(key, value) => setDraft((current) => ({ ...current, [key]: value }))}
-              onRequestWrite={setPendingWrite} onBackup={createBackup}
+              onRequestWrite={setPendingWrite} onSaveBackup={saveBackup} onExportBackup={exportBackup}
+              onLowTemperatureChange={requestLowTemperatureChange}
+              onLoadBackup={loadStoredBackup} onImportBackup={(file) => void importBackup(file)}
             />
           )}
         </div>
@@ -363,6 +491,10 @@ function App() {
       {pendingWrite && (
         <ConfirmSheet definition={pendingWrite} oldValue={bmsSettings?.[pendingWrite.key]} newValue={draft[pendingWrite.key]} validation={settingsValidation} writing={writing} language={language}
           onCancel={() => { if (!writing) setPendingWrite(null); }} onConfirm={() => void confirmWrite()} />
+      )}
+      {pendingLowTemperature && bmsSettings && (
+        <LowTemperatureConfirmSheet change={pendingLowTemperature} currentProtection={bmsSettings.chargeUnderTemperature} currentRecovery={bmsSettings.chargeUnderTemperatureRecovery}
+          writing={writing} language={language} onCancel={() => { if (!writing) setPendingLowTemperature(null); }} onConfirm={() => void confirmLowTemperatureChange()} />
       )}
       {legalDocument && <LegalSheet document={legalDocument} language={language} onClose={() => setLegalDocument(null)} />}
     </div>
@@ -458,9 +590,12 @@ function SettingsView(props: {
   expertUnlocked: boolean; backupAt: number | null; validation: string; writeMessage: string; writing: boolean; refreshing: boolean; language: Language;
   onScan: () => void; onConnect: (device: FoundDevice) => void; onDisconnect: () => void; onRefresh: () => void;
   onCode: (value: string) => void; onUnlock: () => void; onDraft: (key: JkSettingKey, value: number | boolean) => void;
-  onRequestWrite: (definition: JkSettingDefinition) => void; onBackup: () => void; onLanguage: (language: Language) => void; onLegal: (document: LegalDocument) => void;
+  onRequestWrite: (definition: JkSettingDefinition) => void; onSaveBackup: () => void; onExportBackup: () => void;
+  onLowTemperatureChange: (protectionEnabled: boolean) => void;
+  onLoadBackup: () => void; onImportBackup: (file: File) => void; onLanguage: (language: Language) => void; onLegal: (document: LegalDocument) => void;
 }) {
   const isConnected = props.connectionState === 'connected';
+  const lowTemperatureProtectionEnabled = Number(props.draft.chargeUnderTemperature) >= 0;
   return <div className="space-y-4">
     <section className="card"><SectionTitle title={tr(props.language, 'Język', 'Language')} icon={Languages} />
       <div className="mt-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
@@ -476,19 +611,47 @@ function SettingsView(props: {
     {props.deviceInfo && <section className="card"><SectionTitle title={tr(props.language, 'Informacje o urządzeniu', 'Device information')} icon={CircleHelp} /><div className="mt-4 divide-y divide-slate-100 text-sm"><InfoRow label={tr(props.language, 'Model', 'Model')} value={props.deviceInfo.model} /><InfoRow label={tr(props.language, 'Sprzęt', 'Hardware')} value={props.deviceInfo.hardwareVersion} /><InfoRow label={tr(props.language, 'Oprogramowanie', 'Software')} value={props.deviceInfo.softwareVersion} /><InfoRow label={tr(props.language, 'Numer seryjny', 'Serial number')} value={props.deviceInfo.serialNumber} /><InfoRow label={tr(props.language, 'Data produkcji', 'Manufacturing date')} value={props.deviceInfo.manufacturingDate || tr(props.language, 'Brak danych', 'No data')} /><InfoRow label={tr(props.language, 'Uruchomienia', 'Power cycles')} value={`${props.deviceInfo.powerOnCount}`} /></div></section>}
     {isConnected && !props.bmsSettings && <Notice tone="info" text={tr(props.language, 'Oczekiwanie na ustawienia BMS. Dotknij odświeżania, aby ponowić odczyt.', 'Waiting for BMS settings. Tap refresh to try again.')} />}
     {props.bmsSettings && <>
-      <section className="card"><div className="flex items-center justify-between"><SectionTitle title={tr(props.language, 'Kopia ustawień', 'Settings backup')} icon={Save} /><button onClick={props.onBackup} className="button-secondary"><Download size={16} /> {tr(props.language, 'Zapisz', 'Save')}</button></div><p className="mt-3 text-sm text-slate-500">{props.backupAt ? `${tr(props.language, 'Ostatnia kopia', 'Last backup')} ${new Date(props.backupAt).toLocaleString(props.language)}` : tr(props.language, 'Przed pierwszą zmianą zapisz kopię bieżących parametrów.', 'Save a copy of current parameters before making the first change.')}</p></section>
-      {!props.expertUnlocked ? <section className="card"><SectionTitle title={tr(props.language, 'Zmiana ustawień BMS', 'Change BMS settings')} icon={LockKeyhole} /><p className="mt-3 text-sm leading-6 text-slate-600">{tr(props.language, 'Zmiana parametrów wpływa bezpośrednio na ochronę akumulatora. Podaj kod aplikacji, aby odblokować edycję.', 'Changing parameters directly affects battery protection. Enter the app code to unlock editing.')}</p><div className="mt-4 flex gap-2"><input type="password" inputMode="numeric" maxLength={6} value={props.expertCode} onChange={(event) => props.onCode(event.target.value)} placeholder={tr(props.language, 'Kod aplikacji', 'App code')} className="input flex-1" /><button onClick={props.onUnlock} className="button-primary w-auto px-5">{tr(props.language, 'Odblokuj', 'Unlock')}</button></div>{props.writeMessage && <p className="mt-3 text-sm text-amber-700">{props.writeMessage}</p>}</section> : <section className="card"><SectionTitle title={tr(props.language, 'Parametry ochrony', 'Protection parameters')} icon={SlidersHorizontal} /><p className="mt-2 text-xs leading-5 text-slate-500">{tr(props.language, 'Każda zmiana jest wysyłana osobno i sprawdzana po ponownym odczycie z BMS.', 'Each change is sent separately and verified by reading it back from the BMS.')}</p>{props.validation && <div className="mt-3"><Notice tone="warning" text={props.validation} /></div>}<div className="mt-4 divide-y divide-slate-100">{JK_SETTING_DEFINITIONS.map((definition) => <SettingRow key={definition.key} definition={definition} value={props.draft[definition.key]} disabled={props.writing} language={props.language} onChange={(value) => props.onDraft(definition.key, value)} onSave={() => props.onRequestWrite(definition)} />)}</div>{props.writeMessage && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{props.writeMessage}</p>}</section>}
+      <section className="card"><SectionTitle title={tr(props.language, 'Kopia ustawień', 'Settings backup')} icon={Save} /><p className="mt-3 text-sm leading-6 text-slate-500">{tr(props.language, 'Kopia lokalna jest przechowywana w prywatnej pamięci aplikacji na tym telefonie. Eksport tworzy plik JSON, który można zachować w aplikacji Pliki.', 'The local backup is stored in the app private storage on this phone. Export creates a JSON file that can be saved in the Files app.')}</p><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={props.onSaveBackup} className="button-secondary justify-center"><Save size={16} /> {tr(props.language, 'Zapisz lokalnie', 'Save locally')}</button><button onClick={props.onLoadBackup} className="button-secondary justify-center"><RotateCcw size={16} /> {tr(props.language, 'Wczytaj lokalną', 'Load local')}</button><button onClick={props.onExportBackup} className="button-secondary justify-center"><Download size={16} /> {tr(props.language, 'Eksportuj JSON', 'Export JSON')}</button><label className="button-secondary cursor-pointer justify-center"><Upload size={16} /> {tr(props.language, 'Importuj JSON', 'Import JSON')}<input type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onImportBackup(file); event.target.value = ''; }} /></label></div><p className="mt-3 text-xs text-slate-400">{props.backupAt ? `${tr(props.language, 'Ostatnia kopia lokalna', 'Last local backup')} ${new Date(props.backupAt).toLocaleString(props.language)}` : tr(props.language, 'Nie zapisano jeszcze kopii lokalnej.', 'No local backup has been saved yet.')}</p></section>
+      {!props.expertUnlocked ? <section className="card"><SectionTitle title={tr(props.language, 'Zmiana ustawień BMS', 'Change BMS settings')} icon={LockKeyhole} /><p className="mt-3 text-sm leading-6 text-slate-600">{tr(props.language, 'To jest kod ochronny aplikacji, a nie hasło Bluetooth ani hasło zapisane w BMS. Wpisz 123456. Edycja odblokuje się automatycznie po szóstej cyfrze.', 'This is the app safety code, not the Bluetooth password or the password stored in the BMS. Enter 123456. Editing unlocks automatically after the sixth digit.')}</p><form className="mt-4 flex gap-2" onSubmit={(event) => { event.preventDefault(); props.onUnlock(); }}><input type="password" inputMode="numeric" enterKeyHint="done" autoComplete="off" pattern="[0-9]*" maxLength={6} value={props.expertCode} onChange={(event) => props.onCode(event.target.value)} placeholder={tr(props.language, 'Kod aplikacji', 'App code')} aria-label={tr(props.language, 'Kod aplikacji', 'App code')} className="input min-w-0 flex-1" /><button type="submit" className="button-primary w-auto px-5">{tr(props.language, 'Odblokuj', 'Unlock')}</button></form>{props.writeMessage && <p className="mt-3 text-sm text-amber-700">{props.writeMessage}</p>}</section> : <>
+        <section className="card">
+          <SectionTitle title={tr(props.language, 'Sterowanie BMS', 'BMS controls')} icon={Zap} />
+          <p className="mt-2 text-xs leading-5 text-slate-500">{tr(props.language, 'Przełączniki sterują bezpośrednio wyjściami ładowania i rozładowania. Każdą zmianę zatwierdź przyciskiem zapisu.', 'These switches directly control the charging and discharging outputs. Confirm each change with the save button.')}</p>
+          <div className="mt-4 divide-y divide-slate-100">{CONTROL_SETTINGS.map((definition) => <SettingRow key={definition.key} definition={definition} value={props.draft[definition.key]} disabled={props.writing} language={props.language} onChange={(value) => props.onDraft(definition.key, value)} onSave={() => props.onRequestWrite(definition)} />)}</div>
+        </section>
+        <section className="card">
+          <SectionTitle title={tr(props.language, 'Ładowanie w niskiej temperaturze', 'Low temperature charging')} icon={Thermometer} />
+          <p className="mt-2 text-xs leading-5 text-slate-500">{tr(props.language, 'JK02 nie ma osobnego przełącznika tej ochrony. Aplikacja zapisuje razem próg ochrony i temperaturę powrotu.', 'JK02 has no separate switch for this protection. The app saves the protection and recovery thresholds together.')}</p>
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{tr(props.language, 'Ochrona ładowania poniżej 0°C', 'Charging protection below 0°C')}</p><p className={`mt-1 text-xs ${lowTemperatureProtectionEnabled ? 'text-emerald-700' : 'text-rose-600'}`}>{lowTemperatureProtectionEnabled ? tr(props.language, 'Włączona, blokada przy 0°C', 'Enabled, blocked at 0°C') : tr(props.language, 'Wyłączona, ładowanie poniżej 0°C dozwolone', 'Disabled, charging below 0°C allowed')}</p></div>
+            <button type="button" role="switch" aria-checked={lowTemperatureProtectionEnabled} disabled={props.writing} onClick={() => props.onLowTemperatureChange(!lowTemperatureProtectionEnabled)} aria-label={tr(props.language, 'Zmień ochronę ładowania poniżej zera', 'Change charging protection below zero')} className={`relative h-8 w-14 shrink-0 rounded-full transition ${lowTemperatureProtectionEnabled ? 'bg-teal-700' : 'bg-rose-600'}`}><span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition ${lowTemperatureProtectionEnabled ? 'left-7' : 'left-1'}`} /></button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><MiniValue label={tr(props.language, 'Próg ochrony', 'Protection threshold')} value={`${String(props.draft.chargeUnderTemperature)} °C`} /><MiniValue label={tr(props.language, 'Powrót ładowania', 'Charging recovery')} value={`${String(props.draft.chargeUnderTemperatureRecovery)} °C`} /></div>
+          <div className="mt-4 divide-y divide-slate-100">{LOW_TEMPERATURE_SETTINGS.map((definition) => <SettingRow key={definition.key} definition={definition} value={props.draft[definition.key]} disabled={props.writing} language={props.language} onChange={(value) => props.onDraft(definition.key, value)} onSave={() => props.onRequestWrite(definition)} />)}</div>
+        </section>
+        <section className="card">
+          <SectionTitle title={tr(props.language, 'Pozostałe parametry ochrony', 'Other protection parameters')} icon={SlidersHorizontal} />
+          <p className="mt-2 text-xs leading-5 text-slate-500">{tr(props.language, 'Każda zmiana jest wysyłana osobno i sprawdzana po ponownym odczycie z BMS.', 'Each change is sent separately and verified by reading it back from the BMS.')}</p>
+          {props.validation && <div className="mt-3"><Notice tone="warning" text={props.validation} /></div>}
+          <div className="mt-4 divide-y divide-slate-100">{OTHER_SETTINGS.map((definition) => <SettingRow key={definition.key} definition={definition} value={props.draft[definition.key]} disabled={props.writing} language={props.language} onChange={(value) => props.onDraft(definition.key, value)} onSave={() => props.onRequestWrite(definition)} />)}</div>
+          {props.writeMessage && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{props.writeMessage}</p>}
+        </section>
+      </>}
     </>}
     <section className="rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm leading-6 text-teal-900"><strong>{tr(props.language, 'Wskazówka', 'Tip')}</strong><p>{tr(props.language, 'Zamknij oficjalną aplikację JK przed połączeniem. Jeden moduł BMS zwykle obsługuje tylko jedno aktywne połączenie Bluetooth.', 'Close the official JK app before connecting. A BMS module usually supports only one active Bluetooth connection.')}</p></section>
     <section className="card"><SectionTitle title={tr(props.language, 'Informacje prawne', 'Legal information')} icon={FileText} /><div className="mt-3 divide-y divide-slate-100"><button onClick={() => props.onLegal('privacy')} className="flex w-full items-center justify-between py-3 text-left text-sm font-medium"><span>{tr(props.language, 'Polityka prywatności', 'Privacy Policy')}</span><ChevronRight size={18} className="text-slate-400" /></button><button onClick={() => props.onLegal('terms')} className="flex w-full items-center justify-between py-3 text-left text-sm font-medium"><span>{tr(props.language, 'Warunki użytkowania', 'Terms of Use')}</span><ChevronRight size={18} className="text-slate-400" /></button></div></section>
-    <p className="pb-2 text-center text-xs text-slate-400">BMS Reader  •  {tr(props.language, 'wersja', 'version')} {APP_VERSION}</p>
+    <p className="pb-2 text-center text-xs text-slate-400">BMS Monitor: LiFePO4  •  {tr(props.language, 'wersja', 'version')} {APP_VERSION}</p>
   </div>;
 }
 
 function SettingRow({ definition, value, disabled, language, onChange, onSave }: { definition: JkSettingDefinition; value: number | boolean | undefined; disabled: boolean; language: Language; onChange: (value: number | boolean) => void; onSave: () => void }) {
   const label = settingLabel(definition, language);
-  if (definition.kind === 'switch') return <div className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{label}</p>{definition.dangerous && <p className="text-xs text-rose-600">{tr(language, 'Ustawienie krytyczne', 'Critical setting')}</p>}</div><button disabled={disabled} onClick={() => onChange(!value)} className={`relative h-7 w-12 rounded-full transition ${value ? 'bg-teal-700' : 'bg-slate-300'}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${value ? 'left-6' : 'left-1'}`} /></button><button disabled={disabled} onClick={onSave} aria-label={tr(language, 'Zapisz ustawienie', 'Save setting')} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700"><Save size={16} /></button></div>;
+  if (definition.kind === 'switch') return <div className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{label}</p><p className={`text-xs ${value ? 'text-emerald-700' : 'text-slate-500'}`}>{value ? tr(language, 'Włączone', 'Enabled') : tr(language, 'Wyłączone', 'Disabled')}</p>{definition.dangerous && <p className="text-xs text-rose-600">{tr(language, 'Ustawienie krytyczne', 'Critical setting')}</p>}</div><button type="button" role="switch" aria-checked={Boolean(value)} disabled={disabled} onClick={() => onChange(!value)} aria-label={`${label}: ${value ? tr(language, 'włączone', 'enabled') : tr(language, 'wyłączone', 'disabled')}`} className={`relative h-8 w-14 shrink-0 rounded-full transition ${value ? 'bg-teal-700' : 'bg-slate-300'}`}><span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition ${value ? 'left-7' : 'left-1'}`} /></button><button disabled={disabled} onClick={onSave} aria-label={tr(language, 'Zapisz ustawienie', 'Save setting')} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 disabled:opacity-40"><Save size={16} /></button></div>;
   return <div className="py-4"><div className="mb-2 flex items-center justify-between gap-2"><label className="text-sm font-medium">{label}</label>{definition.dangerous && <span className="text-[10px] font-semibold uppercase text-rose-600">{tr(language, 'Krytyczne', 'Critical')}</span>}</div><div className="flex items-center gap-2"><input disabled={disabled} type="number" inputMode="decimal" min={definition.min} max={definition.max} step={definition.step} value={typeof value === 'number' ? value : ''} onChange={(event) => onChange(Number(event.target.value))} className="input min-w-0 flex-1" /><span className="w-8 text-sm text-slate-500">{definition.unit}</span><button disabled={disabled} onClick={onSave} aria-label={tr(language, 'Zapisz ustawienie', 'Save setting')} className="grid h-11 w-11 place-items-center rounded-xl bg-teal-700 text-white disabled:opacity-40"><Save size={17} /></button></div><p className="mt-1 text-[11px] text-slate-400">{tr(language, 'Zakres', 'Range')} {definition.min} {tr(language, 'do', 'to')} {definition.max} {definition.unit}</p></div>;
+}
+
+function LowTemperatureConfirmSheet({ change, currentProtection, currentRecovery, writing, language, onCancel, onConfirm }: { change: LowTemperatureChange; currentProtection: number; currentRecovery: number; writing: boolean; language: Language; onCancel: () => void; onConfirm: () => void }) {
+  const currentProtectionEnabled = currentProtection >= 0;
+  return <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 p-3 backdrop-blur-sm"><div className="safe-bottom mx-auto w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl"><div className="mx-auto mb-4 h-1 w-12 rounded-full bg-slate-200" /><div className="flex items-start gap-3"><div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${change.protectionEnabled ? 'bg-teal-50 text-teal-700' : 'bg-rose-50 text-rose-700'}`}><Thermometer size={21} /></div><div><h3 className="font-semibold">{tr(language, 'Potwierdź zmianę ochrony', 'Confirm protection change')}</h3><p className="mt-1 text-sm text-slate-500">{tr(language, 'Ochrona ładowania poniżej 0°C', 'Charging protection below 0°C')}</p></div></div><div className="mt-5 grid grid-cols-2 gap-3"><MiniValue label={tr(language, 'Obecnie', 'Current')} value={currentProtectionEnabled ? tr(language, 'Włączona', 'Enabled') : tr(language, 'Wyłączona', 'Disabled')} /><MiniValue label={tr(language, 'Po zmianie', 'New value')} value={change.protectionEnabled ? tr(language, 'Włączona', 'Enabled') : tr(language, 'Wyłączona', 'Disabled')} /></div><div className="mt-3 grid grid-cols-2 gap-3"><MiniValue label={tr(language, 'Próg ochrony', 'Protection threshold')} value={`${currentProtection} → ${change.protection} °C`} /><MiniValue label={tr(language, 'Powrót', 'Recovery')} value={`${currentRecovery} → ${change.recovery} °C`} /></div>{change.protectionEnabled ? <div className="mt-4"><Notice tone="info" text={tr(language, 'BMS zatrzyma ładowanie przy 0°C i wznowi je po wzroście temperatury do 5°C.', 'The BMS will stop charging at 0°C and resume when the temperature rises to 5°C.')} /></div> : <div className="mt-4"><Notice tone="danger" text={tr(language, 'Wyłączenie ochrony pozwoli na ładowanie poniżej 0°C w zakresie obsługiwanym przez BMS. Może to trwale uszkodzić ogniwa LiFePO4. Używaj tej opcji wyłącznie z akumulatorem wyposażonym w skuteczne ogrzewanie lub gdy producent ogniw wyraźnie na to pozwala.', 'Disabling protection allows charging below 0°C within the range supported by the BMS. This can permanently damage LiFePO4 cells. Use this only with effective battery heating or when explicitly permitted by the cell manufacturer.')} /></div>}<p className="mt-4 text-xs leading-5 text-slate-500">{tr(language, 'Aplikacja zapisze dwa rejestry i potwierdzi obie wartości przez ponowny odczyt.', 'The app will save two registers and confirm both values by reading them back.')}</p><div className="mt-5 grid grid-cols-2 gap-3"><button disabled={writing} onClick={onCancel} className="button-secondary justify-center">{tr(language, 'Anuluj', 'Cancel')}</button><button disabled={writing} onClick={onConfirm} className="button-primary">{writing ? <RefreshCw className="animate-spin" size={17} /> : <Check size={17} />} {tr(language, 'Potwierdź', 'Confirm')}</button></div></div></div>;
 }
 
 function ConfirmSheet({ definition, oldValue, newValue, validation, writing, language, onCancel, onConfirm }: { definition: JkSettingDefinition; oldValue: number | boolean | undefined; newValue: number | boolean | undefined; validation: string; writing: boolean; language: Language; onCancel: () => void; onConfirm: () => void }) {

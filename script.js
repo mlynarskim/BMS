@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-console.log('BMS Reader starting...');
+console.log('BMS Monitor starting...');
 
 // Icon Components
 const Battery = ({ size = 20, className = "" }) => (
@@ -207,7 +207,7 @@ const dataViewToNumbers = (dataView) => {
     return Array.from(new Uint8Array(dataView.buffer));
 };
 
-// Main BMS Reader App Component
+// Main BMS Monitor App Component
 const BMSReaderApp = () => {
     console.log('BMSReaderApp rendering...');
     
@@ -500,7 +500,7 @@ const BMSReaderApp = () => {
         },
             React.createElement('div', { className: "text-center" },
                 React.createElement('div', { className: "spinner mx-auto mb-4" }),
-                React.createElement('h1', { className: "text-2xl font-bold mb-2" }, 'BMS Reader'),
+                React.createElement('h1', { className: "text-2xl font-bold mb-2" }, 'BMS Monitor'),
                 React.createElement('p', { className: "text-blue-100" }, 'Inicjalizacja...')
             )
         )
@@ -964,7 +964,7 @@ const BMSReaderApp = () => {
             React.createElement('div', { className: "bg-gray-100 p-4 rounded-lg" },
                 React.createElement('h3', { className: "font-medium text-gray-700 mb-2" }, 'O aplikacji'),
                 React.createElement('p', { className: "text-sm text-gray-600 mb-2" }, 
-                    'BMS Reader v1.0'
+                    'BMS Monitor v1.0'
                 ),
                 React.createElement('p', { className: "text-xs text-gray-500" },
                     'Monitor systemów zarządzania baterią. Obsługuje protokoły: Xiaoxiang, JK BMS, DALY, ANT, SEPLOS, PACE, LLT Power.'
@@ -997,7 +997,7 @@ const BMSReaderApp = () => {
     return React.createElement('div', { className: "h-screen bg-gray-50 flex flex-col fade-in" },
         // Header
         React.createElement('div', { className: "bg-blue-600 text-white p-4 safe-area-top shadow-lg" },
-            React.createElement('h1', { className: "text-xl font-bold text-center" }, 'BMS Reader'),
+            React.createElement('h1', { className: "text-xl font-bold text-center" }, 'BMS Monitor'),
             React.createElement('p', { className: "text-center text-blue-100 text-sm" }, 
                 'Monitor systemów BMS'
             )

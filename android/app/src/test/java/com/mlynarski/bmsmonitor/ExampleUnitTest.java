@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.mlynarski.bmsmonitor;
 
 import static org.junit.Assert.*;
 

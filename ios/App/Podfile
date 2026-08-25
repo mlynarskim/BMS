@@ -14,7 +14,7 @@ def capacitor_pods
   pod 'CapacitorCommunityBluetoothLe', :path => '../../node_modules/@capacitor-community/bluetooth-le'
 end
 
-target 'App' do
+target 'BMS Monitor' do
   capacitor_pods
   # Add your Pods here
 end

@@ -1,4 +1,4 @@
-package com.bmsreader.app;
+package com.mlynarski.bmsmonitor;
 
 import com.getcapacitor.BridgeActivity;
 

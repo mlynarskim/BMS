@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.bmsreader.app',
-  appName: 'BMS Reader',
+  appId: 'com.mlynarski.bmsmonitor',
+  appName: 'BMS Monitor',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
