@@ -11,6 +11,30 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage
+.vite
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Mobile build outputs and archives
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+*.xcuserstate
+DerivedData
+Pods
+.gradle
+build
+
+# Test and tooling output
+.eslintcache
+.nyc_output
+test-results
+playwright-report
 
 # Editor directories and files
 .vscode/*
