@@ -1,4 +1,5 @@
 import { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize } from '@capacitor/keyboard';
 
 const config: CapacitorConfig = {
   appId: 'com.mlynarski.bmsmonitor',
@@ -8,12 +9,15 @@ const config: CapacitorConfig = {
     androidScheme: 'https'
   },
   plugins: {
+    Keyboard: {
+      resize: KeyboardResize.None
+    },
     BluetoothLe: {
       displayStrings: {
-        scanning: "Skanowanie urządzeń BMS...",
-        cancel: "Anuluj",
-        availableDevices: "Dostępne urządzenia",
-        noDeviceFound: "Nie znaleziono urządzeń"
+        scanning: "Scanning for BMS devices...",
+        cancel: "Cancel",
+        availableDevices: "Available devices",
+        noDeviceFound: "No devices found"
       }
     }
   }

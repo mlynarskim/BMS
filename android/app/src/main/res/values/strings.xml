@@ -4,4 +4,5 @@
     <string name="title_activity_main">BMS Monitor</string>
     <string name="package_name">com.mlynarski.bmsmonitor</string>
     <string name="custom_url_scheme">com.mlynarski.bmsmonitor</string>
+    <string name="admob_app_id">ca-app-pub-5307701268996147~1258172507</string>
 </resources>

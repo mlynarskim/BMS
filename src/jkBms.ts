@@ -56,6 +56,8 @@ export interface JkDeviceInfo {
   uptimeSeconds: number;
   powerOnCount: number;
   deviceName: string;
+  bluetoothPassword: string;
+  settingsPassword: string;
   manufacturingDate: string;
   serialNumber: string;
 }
@@ -133,8 +135,8 @@ export const JK_SETTING_DEFINITIONS: JkSettingDefinition[] = [
   { key: 'maxBalanceCurrent', label: 'Maksymalny prąd balansowania', unit: 'A', min: 0.1, max: 10, step: 0.1, factor: 1000, length: 4, register24: 0x13, register32: 0x13 },
   { key: 'chargeOverTemperature', label: 'Maksymalna temperatura ładowania', unit: '°C', min: 30, max: 80, step: 1, factor: 10, length: 4, register24: 0x14, register32: 0x14 },
   { key: 'chargeOverTemperatureRecovery', label: 'Powrót po wysokiej temperaturze ładowania', unit: '°C', min: 20, max: 75, step: 1, factor: 10, length: 4, register24: 0x15, register32: 0x15 },
-  { key: 'chargeUnderTemperature', label: 'Minimalna temperatura ładowania', unit: '°C', min: -20, max: 20, step: 1, factor: 10, length: 4, register24: 0x18, register32: 0x18 },
-  { key: 'chargeUnderTemperatureRecovery', label: 'Powrót po niskiej temperaturze ładowania', unit: '°C', min: -15, max: 25, step: 1, factor: 10, length: 4, register24: 0x19, register32: 0x19 },
+  { key: 'chargeUnderTemperature', label: 'Minimalna temperatura ładowania', unit: '°C', min: 0, max: 14, step: 1, factor: 10, length: 4, register24: 0x18, register32: 0x18 },
+  { key: 'chargeUnderTemperatureRecovery', label: 'Powrót po niskiej temperaturze ładowania', unit: '°C', min: 1, max: 15, step: 1, factor: 10, length: 4, register24: 0x19, register32: 0x19 },
   { key: 'capacity', label: 'Pojemność znamionowa', unit: 'Ah', min: 1, max: 2000, step: 1, factor: 1000, length: 4, register24: 0x20, register32: 0x20, dangerous: true },
   { key: 'chargingEnabled', label: 'Ładowanie', unit: '', min: 0, max: 1, step: 1, factor: 1, length: 4, register24: 0x1d, register32: 0x1d, dangerous: true, kind: 'switch' },
   { key: 'dischargingEnabled', label: 'Rozładowanie', unit: '', min: 0, max: 1, step: 1, factor: 1, length: 4, register24: 0x1e, register32: 0x1e, dangerous: true, kind: 'switch' },
@@ -173,8 +175,26 @@ export function buildJkCommand(register: number, value = 0, length = 0): DataVie
   return new DataView(frame.buffer);
 }
 
+export function buildJkTextCommand(register: number, value: string): DataView {
+  const encoded = new TextEncoder().encode(value);
+  if (!encoded.length || encoded.length > 10 || Array.from(encoded).some((byte) => byte > 0x7f)) {
+    throw new Error('Tekst polecenia JK musi zawierać od 1 do 10 znaków ASCII.');
+  }
+  const frame = new Uint8Array(20);
+  frame.set([0xaa, 0x55, 0x90, 0xeb, register & 0xff, encoded.length & 0xff], 0);
+  frame.set(encoded, 6);
+  frame[19] = checksum(frame.subarray(0, 19));
+  return new DataView(frame.buffer);
+}
+
 export async function writeJkCommand(client: BleClientInterface, deviceId: string, path: JkGattPath, register = 0x96, value = 0, length = 0): Promise<void> {
   const frame = buildJkCommand(register, value, length);
+  if (path.writeWithoutResponse) await client.writeWithoutResponse(deviceId, path.service, path.write, frame);
+  else await client.write(deviceId, path.service, path.write, frame);
+}
+
+export async function writeJkTextCommand(client: BleClientInterface, deviceId: string, path: JkGattPath, register: number, value: string): Promise<void> {
+  const frame = buildJkTextCommand(register, value);
   if (path.writeWithoutResponse) await client.writeWithoutResponse(deviceId, path.service, path.write, frame);
   else await client.write(deviceId, path.service, path.write, frame);
 }
@@ -297,7 +317,8 @@ export function parseJkDeviceInfoFrame(frame: Uint8Array): JkDeviceInfo {
   return {
     model: readAscii(frame, 6, 16), hardwareVersion: readAscii(frame, 22, 8), softwareVersion: readAscii(frame, 30, 8),
     uptimeSeconds: readUint32LE(frame, 38), powerOnCount: readUint32LE(frame, 42), deviceName: readAscii(frame, 46, 16),
-    manufacturingDate: formatManufacturingDate(readAscii(frame, 78, 6)), serialNumber: readAscii(frame, 86, 11),
+    bluetoothPassword: readAscii(frame, 62, 16), manufacturingDate: formatManufacturingDate(readAscii(frame, 78, 6)),
+    serialNumber: readAscii(frame, 86, 11), settingsPassword: readAscii(frame, 118, 16),
   };
 }
 
